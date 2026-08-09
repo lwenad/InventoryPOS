@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Linq; // Required for the .Cast<string>() extension
 using System.Windows.Forms;
 using InventoryPOS.Models;
 
@@ -24,7 +25,7 @@ namespace InventoryPOS.Forms
         private NumericUpDown numListingPrice = null!;
         private NumericUpDown numCOG = null!;
         private TextBox txtSKU = null!;
-        private TextBox txtPlatform = null!;
+        private CheckedListBox chkPlatform = null!; // Changed to CheckedListBox
         private Button btnSave = null!;
         private Button btnCancel = null!;
 
@@ -56,7 +57,7 @@ namespace InventoryPOS.Forms
             // Form settings
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(580, 620);
+            this.ClientSize = new Size(580, 660); // Slightly increased height to fit the taller list box
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -158,10 +159,20 @@ namespace InventoryPOS.Forms
             txtSKU = AddTextBox(130, y, controlWidth);
             y += spacing;
 
-            // Platform
+            // Platform (Updated UI)
             AddLabel("Platform", 20, y, labelWidth);
-            txtPlatform = AddTextBox(130, y, controlWidth);
-            y += spacing + 25;
+            chkPlatform = new CheckedListBox
+            {
+                Location = new Point(130, y),
+                Size = new Size(controlWidth, 65),
+                CheckOnClick = true,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            chkPlatform.Items.AddRange(new string[] { "eBay", "Poshmark", "Depop" });
+            mainPanel.Controls.Add(chkPlatform);
+
+            y += 80;
 
             // Action Buttons
             btnSave = new Button
@@ -245,7 +256,21 @@ namespace InventoryPOS.Forms
             numListingPrice.Value = Math.Min(Math.Max(_item.ListingPrice, numListingPrice.Minimum), numListingPrice.Maximum);
             numCOG.Value = Math.Min(Math.Max(_item.COG, numCOG.Minimum), numCOG.Maximum);
             txtSKU.Text = _item.SKU;
-            txtPlatform.Text = _item.Platform;
+
+            // Platform multi-select load logic
+            if (!string.IsNullOrWhiteSpace(_item.Platform))
+            {
+                var savedPlatforms = _item.Platform.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var platform in savedPlatforms)
+                {
+                    int index = chkPlatform.Items.IndexOf(platform.Trim());
+                    if (index >= 0)
+                    {
+                        chkPlatform.SetItemChecked(index, true);
+                    }
+                }
+            }
         }
 
         private void BtnSave_Click(object? sender, EventArgs e)
@@ -279,7 +304,10 @@ namespace InventoryPOS.Forms
                 ListingPrice = numListingPrice.Value,
                 COG = numCOG.Value,
                 SKU = txtSKU.Text.Trim(),
-                Platform = txtPlatform.Text.Trim(),
+
+                // Platform multi-select save logic
+                Platform = string.Join(", ", chkPlatform.CheckedItems.Cast<string>()),
+
                 CreatedAt = _item.CreatedAt,
                 UpdatedAt = DateTime.Now
             };
