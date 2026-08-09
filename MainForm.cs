@@ -59,7 +59,7 @@ namespace InventoryPOS
             CreateToolStrip();
             CreateDataGridView();
             CreateStatusStrip();
-
+            menuStrip.SendToBack();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
