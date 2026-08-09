@@ -1,0 +1,43 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+
+namespace InventoryPOS.Models
+{
+    public class InventoryItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+
+        [MaxLength(80)]
+        public string Title { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public string Category { get; set; } = string.Empty;
+
+        public string SubCategory { get; set; } = string.Empty;
+
+        public int Quantity { get; set; } = 1;
+
+        public string Size { get; set; } = string.Empty;
+
+        public string Condition { get; set; } = string.Empty;
+
+        public string Brand { get; set; } = string.Empty;
+
+        public string Colors { get; set; } = string.Empty;
+
+        public decimal ListingPrice { get; set; } = 0m;
+
+        public decimal COG { get; set; } = 0m;
+
+        public string SKU { get; set; } = string.Empty;
+
+        public string Platform { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    }
+}
