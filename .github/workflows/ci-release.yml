@@ -7,7 +7,10 @@ on:
       - 'v*' # Triggers automatic release build on version tags (e.g. v1.0.0)
   pull_request:
     branches: [ "main", "master" ]
-
+    
+permissions:
+  contents: write
+  
 jobs:
   build:
     runs-on: windows-latest
@@ -30,7 +33,7 @@ jobs:
     - name: Publish Release Executable
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'push'
       run: >
-        dotnet publish
+        dotnet publish ./InventoryPOS.csproj
         --configuration Release
         --output ./publish
         -p:PublishSingleFile=true
