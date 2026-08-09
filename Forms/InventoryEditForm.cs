@@ -174,7 +174,7 @@ namespace InventoryPOS.Forms
             y += spacing;
 
             // Platform (Updated UI)
-            AddLabel("Platform", 20, y, labelWidth);
+            AddLabel("Listing Platform", 20, y, labelWidth);
             chkPlatform = new CheckedListBox
             {
                 Location = new Point(130, y),
@@ -278,10 +278,9 @@ namespace InventoryPOS.Forms
             txtSKU.Text = _item.SKU;
 
             // Platform multi-select load logic
-            if (!string.IsNullOrWhiteSpace(_item.Platform))
+            if (!string.IsNullOrWhiteSpace(_item.ListingPlatform))
             {
-                var savedPlatforms = _item.Platform.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
+                var savedPlatforms = _item.ListingPlatform.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var platform in savedPlatforms)
                 {
                     int index = chkPlatform.Items.IndexOf(platform.Trim());
@@ -324,7 +323,7 @@ namespace InventoryPOS.Forms
                 ListingPrice = numListingPrice.Value,
                 COG = numCOG.Value,
                 SKU = txtSKU.Text.Trim(),
-                Platform = string.Join(", ", chkPlatform.CheckedItems.Cast<string>()),
+                ListingPlatform = string.Join(", ", chkPlatform.CheckedItems.Cast<string>()),
                 CreatedAt = _item.CreatedAt,
                 UpdatedAt = DateTime.Now
             };

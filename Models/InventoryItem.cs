@@ -34,7 +34,7 @@ namespace InventoryPOS.Models
 
         public string SKU { get; set; } = string.Empty;
 
-        public string Platform { get; set; } = string.Empty;
+        public string ListingPlatform { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
