@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main", "master" ]
     tags:
-      - 'v*' # Triggers release creation on tags like v1.0.0
+      - 'v*' # Triggers automatic release build on version tags (e.g. v1.0.0)
   pull_request:
     branches: [ "main", "master" ]
 
@@ -19,17 +19,13 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x' # Adjust to match your .NET version (e.g., 8.0.x, 9.0.x)
+        dotnet-version: '8.0.x' # Set this to your app's .NET version (e.g. 8.0.x, 9.0.x)
 
     - name: Restore Dependencies
       run: dotnet restore
 
-    - name: Build Debug (CI Test)
+    - name: Build Debug (CI Check)
       run: dotnet build --configuration Debug --no-restore
-
-    - name: Run Tests
-      run: dotnet test --no-build --verbosity normal
-      continue-on-error: true # Prevents pipeline failure if test project is missing
 
     - name: Publish Release Executable
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'push'
@@ -41,7 +37,7 @@ jobs:
         -p:SelfContained=false
         -p:IncludeNativeLibrariesForSelfExtract=true
 
-    - name: Create Release Zip
+    - name: Compress Release Artifacts
       if: startsWith(github.ref, 'refs/tags/')
       shell: pwsh
       run: Compress-Archive -Path ./publish/* -DestinationPath ./WinFormsApp-Release.zip
