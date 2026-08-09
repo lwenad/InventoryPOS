@@ -33,6 +33,7 @@ namespace InventoryPOS
         private ToolStripStatusLabel lblStatus = null!;
         private ToolStripStatusLabel lblCount = null!;
         private List<InventoryItem> _allItems = new();
+        private ToolStripStatusLabel lblTotalCOG = null!;
 
         public MainForm()
         {
@@ -395,7 +396,14 @@ namespace InventoryPOS
                 BorderStyle = Border3DStyle.Etched
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblCount });
+            lblTotalCOG = new ToolStripStatusLabel("Total COG: $0.00")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblCount, lblTotalCOG });
             this.Controls.Add(statusStrip);
         }
 
@@ -431,6 +439,15 @@ namespace InventoryPOS
         private void UpdateCount()
         {
             lblCount.Text = $"{_allItems.Count} item{(_allItems.Count != 1 ? "s" : "")}";
+            decimal totalCOG = _allItems.Sum(i => i.COG);
+            lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
+        }
+
+        private void UpdateCount(List<InventoryItem> items)
+        {
+            lblCount.Text = $"{items.Count} item{(items.Count != 1 ? "s" : "")}";
+            decimal totalCOG = items.Sum(i => i.COG);
+            lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
         }
 
         private void DgvInventory_SelectionChanged(object? sender, EventArgs e)
@@ -536,6 +553,7 @@ namespace InventoryPOS
             ).ToList();
 
             BindGrid(filtered);
+            UpdateCount(filtered);
             lblStatus.Text = $"Found {filtered.Count} of {_allItems.Count} items";
         }
 
@@ -594,6 +612,7 @@ namespace InventoryPOS
                 }
 
                 BindGrid(_allItems);
+                UpdateCount();
                 lblStatus.Text = "Item updated successfully";
             }
             catch (Exception ex)
