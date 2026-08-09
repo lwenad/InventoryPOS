@@ -28,6 +28,7 @@ namespace InventoryPOS.Forms
         private CheckedListBox chkPlatform = null!; // Changed to CheckedListBox
         private Button btnSave = null!;
         private Button btnCancel = null!;
+        private ComboBox cmbCondition = null!;
 
         public InventoryItem ResultItem { get; private set; } = null!;
 
@@ -131,7 +132,20 @@ namespace InventoryPOS.Forms
 
             // Condition
             AddLabel("Condition", 20, y, labelWidth);
-            txtCondition = AddTextBox(130, y, controlWidth);
+            cmbCondition = new ComboBox
+            {
+                Location = new Point(130, y),
+                Size = new Size(controlWidth, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbCondition.Items.AddRange(new[]
+            {
+    "New with tags (NWT)",
+    "Pre-owned - Excellent",
+    "Pre-owned - Good",
+    "Pre-owned - Fair"
+});
+            mainPanel.Controls.Add(cmbCondition);
             y += spacing;
 
             // Brand
@@ -250,7 +264,13 @@ namespace InventoryPOS.Forms
             txtSubCategory.Text = _item.SubCategory;
             numQuantity.Value = Math.Min(Math.Max(_item.Quantity, numQuantity.Minimum), numQuantity.Maximum);
             txtSize.Text = _item.Size;
-            txtCondition.Text = _item.Condition;
+
+            // Set ComboBox selection for Condition
+            if (!string.IsNullOrWhiteSpace(_item.Condition) && cmbCondition.Items.Contains(_item.Condition))
+                cmbCondition.SelectedItem = _item.Condition;
+            else
+                cmbCondition.SelectedIndex = -1;
+
             txtBrand.Text = _item.Brand;
             txtColors.Text = _item.Colors;
             numListingPrice.Value = Math.Min(Math.Max(_item.ListingPrice, numListingPrice.Minimum), numListingPrice.Maximum);
@@ -298,16 +318,13 @@ namespace InventoryPOS.Forms
                 SubCategory = txtSubCategory.Text.Trim(),
                 Quantity = (int)numQuantity.Value,
                 Size = txtSize.Text.Trim(),
-                Condition = txtCondition.Text.Trim(),
+                Condition = cmbCondition.SelectedItem?.ToString() ?? string.Empty, // Use ComboBox value
                 Brand = txtBrand.Text.Trim(),
                 Colors = txtColors.Text.Trim(),
                 ListingPrice = numListingPrice.Value,
                 COG = numCOG.Value,
                 SKU = txtSKU.Text.Trim(),
-
-                // Platform multi-select save logic
                 Platform = string.Join(", ", chkPlatform.CheckedItems.Cast<string>()),
-
                 CreatedAt = _item.CreatedAt,
                 UpdatedAt = DateTime.Now
             };

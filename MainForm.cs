@@ -331,17 +331,17 @@ namespace InventoryPOS
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
             {
-                CreateColumn("Title", "Title", 200, true),
-                CreateColumn("Description", "Description", 250, true),
+                CreateColumn("Brand", "Brand", 120, false),
                 CreateColumn("Category", "Category", 120, false),
                 CreateColumn("SubCategory", "Sub Category", 120, false),
+                CreateColumn("ListingPrice", "Listing Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("COG", "COG", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("Title", "Title", 200, false),
+                CreateColumn("Description", "Description", 250, false),
                 CreateColumn("Quantity", "Qty", 60, false, DataGridViewContentAlignment.MiddleCenter),
                 CreateColumn("Size", "Size", 80, false),
                 CreateColumn("Condition", "Condition", 100, false),
-                CreateColumn("Brand", "Brand", 120, false),
                 CreateColumn("Colors", "Colors", 120, false),
-                CreateColumn("ListingPrice", "Listing Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("COG", "COG", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("SKU", "SKU", 100, false),
                 CreateColumn("Platform", "Platform", 100, false)
             });
