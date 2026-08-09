@@ -350,6 +350,8 @@ namespace InventoryPOS
             dgvInventory.CellDoubleClick += DgvInventory_CellDoubleClick;
             dgvInventory.KeyDown += DgvInventory_KeyDown;
 
+            // Forces the last column to stretch and fill the remaining white space
+            dgvInventory.Columns[dgvInventory.Columns.Count - 1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             this.Controls.Add(dgvInventory);
 
             dgvInventory.BringToFront();
