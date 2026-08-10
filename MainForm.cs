@@ -370,6 +370,7 @@ namespace InventoryPOS
                 CreateColumn("ListingPrice", "Listing Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("COG", "COG", 50, true, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("SoldPrice", "Sold Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("SoldDate", "Sold Date", 100, true, DataGridViewContentAlignment.MiddleCenter, "d"),
                 CreateColumn("Condition", "Condition", 100, true),
                 CreateColumn("Title", "Title", 100, false),
                 CreateColumn("Description", "Description", 100, false),

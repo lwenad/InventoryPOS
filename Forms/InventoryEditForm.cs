@@ -18,7 +18,8 @@ namespace InventoryPOS.Forms
         private TextBox txtCategory = null!;
         private TextBox txtSubCategory = null!;
         private NumericUpDown numQuantity = null!;
-        private TextBox txtSize = null!;
+        private ComboBox cmbSize = null!;
+        private TextBox txtCustomSize = null!;
         private TextBox txtCondition = null!;
         private TextBox txtBrand = null!;
         private TextBox txtColors = null!;
@@ -31,6 +32,7 @@ namespace InventoryPOS.Forms
         private ComboBox cmbCondition = null!;
         private ComboBox cmbStatus = null!;
         private NumericUpDown numSoldPrice = null!;
+        private DateTimePicker dtSoldDate = null!;
 
         public InventoryItem ResultItem { get; private set; } = null!;
 
@@ -127,9 +129,29 @@ namespace InventoryPOS.Forms
             numQuantity = AddNumericUpDown(130, y, 100, 0, 999999);
             y += spacing;
 
-            // Size
+            // Size (predefined list with Custom option)
             AddLabel("Size", 20, y, labelWidth);
-            txtSize = AddTextBox(130, y, controlWidth);
+            cmbSize = new ComboBox
+            {
+                Location = new Point(130, y),
+                Size = new Size(200, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbSize.Items.AddRange(new[] { "XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL", "Custom" });
+            cmbSize.SelectedIndexChanged += (s, e) =>
+            {
+                var isCustom = string.Equals(cmbSize.SelectedItem?.ToString(), "Custom", StringComparison.OrdinalIgnoreCase);
+                txtCustomSize.Visible = isCustom;
+                txtCustomSize.Enabled = isCustom;
+                if (isCustom)
+                    txtCustomSize.Focus();
+            };
+            mainPanel.Controls.Add(cmbSize);
+
+            // Custom size textbox (hidden by default)
+            txtCustomSize = AddTextBox(340, y, controlWidth - 210);
+            txtCustomSize.Visible = false;
+            txtCustomSize.Enabled = false;
             y += spacing;
 
             // Condition
@@ -192,6 +214,19 @@ namespace InventoryPOS.Forms
             numSoldPrice.DecimalPlaces = 2;
             numSoldPrice.Enabled = false; // default disabled until Status == Sold
             mainPanel.Controls.Add(numSoldPrice);
+            y += spacing;
+
+            // Sold Date
+            AddLabel("Sold Date", 20, y, labelWidth);
+            dtSoldDate = new DateTimePicker
+            {
+                Location = new Point(130, y),
+                Size = new Size(200, 25),
+                Format = DateTimePickerFormat.Short,
+                ShowUpDown = false,
+                Enabled = false
+            };
+            mainPanel.Controls.Add(dtSoldDate);
             y += spacing;
 
             // SKU
@@ -289,7 +324,28 @@ namespace InventoryPOS.Forms
             txtCategory.Text = _item.Category;
             txtSubCategory.Text = _item.SubCategory;
             numQuantity.Value = Math.Min(Math.Max(_item.Quantity, numQuantity.Minimum), numQuantity.Maximum);
-            txtSize.Text = _item.Size;
+            // Load size: if it matches one of the combo items select it, otherwise select Custom and populate custom textbox
+            if (!string.IsNullOrWhiteSpace(_item.Size) && cmbSize.Items.Contains(_item.Size))
+            {
+                cmbSize.SelectedItem = _item.Size;
+                txtCustomSize.Text = string.Empty;
+                txtCustomSize.Visible = false;
+                txtCustomSize.Enabled = false;
+            }
+            else if (!string.IsNullOrWhiteSpace(_item.Size))
+            {
+                cmbSize.SelectedItem = "Custom";
+                txtCustomSize.Text = _item.Size;
+                txtCustomSize.Visible = true;
+                txtCustomSize.Enabled = true;
+            }
+            else
+            {
+                cmbSize.SelectedIndex = -1;
+                txtCustomSize.Text = string.Empty;
+                txtCustomSize.Visible = false;
+                txtCustomSize.Enabled = false;
+            }
 
             // Set ComboBox selection for Condition
             if (!string.IsNullOrWhiteSpace(_item.Condition) && cmbCondition.Items.Contains(_item.Condition))
@@ -331,16 +387,36 @@ namespace InventoryPOS.Forms
                 if (poshIndex >= 0) chkPlatform.SetItemChecked(poshIndex, true);
             }
 
-            // Load sold price and enable/disable control based on status
+            // Load sold price and enable/disable controls based on status
             numSoldPrice.Value = Math.Min(Math.Max(_item.SoldPrice, numSoldPrice.Minimum), numSoldPrice.Maximum);
-            // Ensure sold price control reflects the current selected status (in case Status combobox was set above)
-            numSoldPrice.Enabled = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
+            var isSold = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
+            // Ensure sold price and sold date controls reflect the current selected status
+            numSoldPrice.Enabled = isSold;
+            if (_item.SoldDate.HasValue)
+            {
+                try { dtSoldDate.Value = _item.SoldDate.Value.Date; } catch { dtSoldDate.Value = DateTime.Today; }
+            }
+            else
+            {
+                dtSoldDate.Value = DateTime.Today;
+            }
+            dtSoldDate.Enabled = isSold;
         }
 
         private void CmbStatus_SelectedIndexChanged(object? sender, EventArgs e)
         {
             var isSold = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
             numSoldPrice.Enabled = isSold;
+            // If status is Sold, enable sold date and set to today if not present
+            dtSoldDate.Enabled = isSold;
+            if (isSold)
+            {
+                // If the current item didn't have a sold date, set it to today
+                if (!_item.SoldDate.HasValue)
+                {
+                    try { dtSoldDate.Value = DateTime.Today; } catch { }
+                }
+            }
         }
 
         private void BtnSave_Click(object? sender, EventArgs e)
@@ -367,10 +443,17 @@ namespace InventoryPOS.Forms
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(txtSize.Text))
+            // Size validation: either a predefined size must be selected or a custom size entered
+            if (cmbSize.SelectedItem == null)
             {
                 MessageBox.Show("Size is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtSize.Focus();
+                cmbSize.Focus();
+                return;
+            }
+            if (string.Equals(cmbSize.SelectedItem?.ToString(), "Custom", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(txtCustomSize.Text))
+            {
+                MessageBox.Show("Please enter a custom size.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCustomSize.Focus();
                 return;
             }
 
@@ -405,10 +488,13 @@ namespace InventoryPOS.Forms
                 Category = txtCategory.Text.Trim(),
                 SubCategory = txtSubCategory.Text.Trim(),
                 Quantity = (int)numQuantity.Value,
-                Size = txtSize.Text.Trim(),
+                Size = string.Equals(cmbSize.SelectedItem?.ToString(), "Custom", StringComparison.OrdinalIgnoreCase)
+                    ? txtCustomSize.Text.Trim()
+                    : (cmbSize.SelectedItem?.ToString() ?? string.Empty),
                 Condition = cmbCondition.SelectedItem?.ToString() ?? string.Empty, // Use ComboBox value
                     Status = cmbStatus.SelectedItem?.ToString() ?? "Created",
                     SoldPrice = numSoldPrice.Value,
+                SoldDate = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase) ? dtSoldDate.Value.Date : (DateTime?)null,
                 Brand = txtBrand.Text.Trim(),
                 Colors = txtColors.Text.Trim(),
                 ListingPrice = numListingPrice.Value,

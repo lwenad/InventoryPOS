@@ -45,5 +45,7 @@ namespace InventoryPOS.Models
 
         // Price at which the item was sold (if applicable)
         public decimal SoldPrice { get; set; } = 0m;
+        // Date when the item was sold (date-only). Null when not sold.
+        public DateTime? SoldDate { get; set; } = null;
     }
 }
