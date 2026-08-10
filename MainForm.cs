@@ -34,6 +34,8 @@ namespace InventoryPOS
         private ToolStripStatusLabel lblCount = null!;
         private List<InventoryItem> _allItems = new();
         private ToolStripStatusLabel lblTotalCOG = null!;
+        private Color _headerBackColor = Color.FromArgb(240, 240, 240);
+        private Color _headerForeColor = Color.Black;
 
         public MainForm()
         {
@@ -313,7 +315,10 @@ namespace InventoryPOS
                 ForeColor = Color.Black,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleLeft,
-                Padding = new Padding(5, 0, 5, 0)
+                Padding = new Padding(5, 0, 5, 0),
+                // Keep header appearance unchanged when rows/cells are selected
+                SelectionBackColor = Color.FromArgb(240, 240, 240),
+                SelectionForeColor = Color.Black
             };
 
             dgvInventory.DefaultCellStyle = new DataGridViewCellStyle
@@ -328,6 +333,10 @@ namespace InventoryPOS
             {
                 BackColor = Color.FromArgb(248, 248, 248)
             };
+
+            // Ensure row selection uses the subtle gray instead of system blue
+            dgvInventory.RowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(224, 224, 224);
+            dgvInventory.RowsDefaultCellStyle.SelectionForeColor = Color.Black;
 
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
@@ -350,12 +359,37 @@ namespace InventoryPOS
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;
             dgvInventory.CellDoubleClick += DgvInventory_CellDoubleClick;
             dgvInventory.KeyDown += DgvInventory_KeyDown;
+            dgvInventory.CurrentCellChanged += DgvInventory_CurrentCellChanged;
 
             // Forces the last column to stretch and fill the remaining white space
             dgvInventory.Columns[dgvInventory.Columns.Count - 1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             this.Controls.Add(dgvInventory);
 
             dgvInventory.BringToFront();
+            // Initialize header styles to avoid header color change when cells are selected
+            ResetHeaderStyles();
+        }
+
+        private void DgvInventory_CurrentCellChanged(object? sender, EventArgs e)
+        {
+            ResetHeaderStyles();
+        }
+
+        private void ResetHeaderStyles()
+        {
+            if (dgvInventory == null || dgvInventory.Columns == null) return;
+
+            foreach (DataGridViewColumn col in dgvInventory.Columns)
+            {
+                // Apply the normal header colors and make sure selection colors match
+                col.HeaderCell.Style.BackColor = _headerBackColor;
+                col.HeaderCell.Style.ForeColor = _headerForeColor;
+                col.HeaderCell.Style.SelectionBackColor = _headerBackColor;
+                col.HeaderCell.Style.SelectionForeColor = _headerForeColor;
+            }
+
+            // Force a repaint so header changes take effect immediately
+            dgvInventory.Refresh();
         }
 
         private DataGridViewColumn CreateColumn(string dataPropertyName, string headerText, int width, bool autoSize = false, DataGridViewContentAlignment alignment = DataGridViewContentAlignment.MiddleLeft, string? format = null)
