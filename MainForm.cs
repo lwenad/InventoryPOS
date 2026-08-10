@@ -377,7 +377,8 @@ namespace InventoryPOS
                 CreateColumn("Size", "Size", 50, true),
                 CreateColumn("Colors", "Colors", 100, true),
                 CreateColumn("ListingPlatform", "Listing Platform", 100, true),
-                CreateColumn("CreatedAt", "Created", 50, true, DataGridViewContentAlignment.MiddleCenter, "g")
+                // Show full date/time including seconds
+                CreateColumn("CreatedAt", "Created", 140, true, DataGridViewContentAlignment.MiddleCenter, "G")
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;

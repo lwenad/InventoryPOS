@@ -359,6 +359,44 @@ namespace InventoryPOS.Forms
                 return;
             }
 
+            // Required fields
+            if (string.IsNullOrWhiteSpace(txtCategory.Text))
+            {
+                MessageBox.Show("Category is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCategory.Focus();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtSize.Text))
+            {
+                MessageBox.Show("Size is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtSize.Focus();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtBrand.Text))
+            {
+                MessageBox.Show("Brand is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtBrand.Focus();
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtColors.Text))
+            {
+                MessageBox.Show("Colors is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtColors.Focus();
+                return;
+            }
+
+            // If status is Sold, ensure a sold price is provided (> 0)
+            var selectedStatus = cmbStatus.SelectedItem?.ToString() ?? string.Empty;
+            if (string.Equals(selectedStatus, "Sold", StringComparison.OrdinalIgnoreCase) && numSoldPrice.Value <= 0m)
+            {
+                MessageBox.Show("Sold items must have a Sold Price greater than 0.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                numSoldPrice.Focus();
+                return;
+            }
+
             ResultItem = new InventoryItem
             {
                 Id = _item.Id,
