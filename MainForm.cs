@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -15,6 +16,8 @@ namespace InventoryPOS
     {
         private readonly InventoryRepository _repository;
         private DataGridView dgvInventory = null!;
+        private BindingSource _bindingSource = null!;
+        private BindingList<InventoryItem> _bindingList = null!;
         private MenuStrip menuStrip = null!;
         private ToolStripMenuItem menuFile = null!;
         private ToolStripMenuItem menuFileLoad = null!;
@@ -309,6 +312,11 @@ namespace InventoryPOS
 
             dgvInventory.AutoGenerateColumns = false;
 
+            // Use a BindingSource to back the grid. BindingSource works with the CurrencyManager
+            // and avoids IndexOutOfRange exceptions when the underlying list changes.
+            _bindingSource = new BindingSource();
+            dgvInventory.DataSource = _bindingSource;
+
             dgvInventory.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.FromArgb(240, 240, 240),
@@ -362,6 +370,7 @@ namespace InventoryPOS
             dgvInventory.CellFormatting += DgvInventory_CellFormatting;
             dgvInventory.CellDoubleClick += DgvInventory_CellDoubleClick;
             dgvInventory.KeyDown += DgvInventory_KeyDown;
+            dgvInventory.DataError += DgvInventory_DataError;
             dgvInventory.CurrentCellChanged += DgvInventory_CurrentCellChanged;
 
             // Forces the last column to stretch and fill the remaining white space
@@ -371,6 +380,15 @@ namespace InventoryPOS
             dgvInventory.BringToFront();
             // Initialize header styles to avoid header color change when cells are selected
             ResetHeaderStyles();
+        }
+
+        private void DgvInventory_DataError(object? sender, DataGridViewDataErrorEventArgs e)
+        {
+            // Suppress the default DataGridView error dialog and show a concise message.
+            e.ThrowException = false;
+            lblStatus.Text = "Grid data error";
+            // Show the error briefly so user knows what happened and to aid debugging.
+            MessageBox.Show(this, $"A data error occurred in the grid: {e.Exception?.Message}", "Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void DgvInventory_CurrentCellChanged(object? sender, EventArgs e)
@@ -468,8 +486,18 @@ namespace InventoryPOS
 
         private void BindGrid(List<InventoryItem> items)
         {
-            dgvInventory.DataSource = null;
-            dgvInventory.DataSource = items;
+            // Keep master list reference
+            _allItems = items;
+
+            if (_bindingSource == null)
+            {
+                _bindingSource = new BindingSource();
+            }
+
+            // Create a BindingList so removals/updates notify the grid safely
+            _bindingList = new BindingList<InventoryItem>(_allItems);
+            _bindingSource.DataSource = _bindingList;
+            dgvInventory.DataSource = _bindingSource;
             dgvInventory.ClearSelection();
         }
 
@@ -687,7 +715,7 @@ namespace InventoryPOS
             }
         }
 
-        private void DeleteSelectedItem()
+        private async void DeleteSelectedItem()
         {
             if (dgvInventory.SelectedRows.Count == 0) return;
 
@@ -700,28 +728,50 @@ namespace InventoryPOS
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
-            if (result == DialogResult.Yes)
-            {
-                _ = DeleteItemAsync(selectedItem.Id);
-            }
-        }
+            if (result != DialogResult.Yes) return;
 
-        private async Task DeleteItemAsync(string id)
-        {
             try
             {
                 lblStatus.Text = "Deleting...";
-                await _repository.DeleteAsync(id);
-                _allItems.RemoveAll(i => i.Id == id);
-                BindGrid(_allItems);
-                UpdateCount();
-                lblStatus.Text = "Item deleted";
+                // Await repository deletion so we don't race with UI events.
+                await _repository.DeleteAsync(selectedItem.Id);
+
+                // Defer UI updates until after current mouse/event processing completes to avoid
+                // CurrencyManager / DataGridView races (Index out of range).
+                this.BeginInvoke((Action)(() =>
+                {
+                    try
+                    {
+                        // Clear current cell to avoid DataGridView trying to access the removed row
+                        if (dgvInventory.CurrentCell != null)
+                        {
+                            dgvInventory.CurrentCell = null;
+                        }
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+
+                    // Remove from binding list so grid updates safely.
+                    if (_bindingList != null && _bindingList.Contains(selectedItem))
+                    {
+                        _bindingList.Remove(selectedItem);
+                    }
+
+                    // Keep master list in sync
+                    _allItems.RemoveAll(i => i.Id == selectedItem.Id);
+
+                    UpdateCount();
+                    lblStatus.Text = "Item deleted";
+                }));
             }
             catch (Exception ex)
             {
                 lblStatus.Text = "Error deleting item";
                 MessageBox.Show($"Failed to delete item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
