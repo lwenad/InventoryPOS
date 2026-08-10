@@ -39,6 +39,14 @@ namespace InventoryPOS
         private ToolStripStatusLabel lblTotalCOG = null!;
         private Color _headerBackColor = Color.FromArgb(240, 240, 240);
         private Color _headerForeColor = Color.Black;
+        private string? _currentFilterColumn;
+        private string? _currentFilterValue;
+        private readonly Dictionary<string, SortOrder> _sortStates = new();
+        private List<InventoryItem> _displayList = new();
+        private List<InventoryItem>? _lastDisplayBeforeSort;
+        private List<InventoryItem>? _preFilterDisplay;
+        private ToolStripStatusLabel lblFilterIndicator = null!;
+        private Dictionary<string, string> _originalHeaderTexts = new();
 
         public MainForm()
         {
@@ -314,9 +322,12 @@ namespace InventoryPOS
 
             dgvInventory.AutoGenerateColumns = false;
 
-            // Use a BindingSource to back the grid. BindingSource works with the CurrencyManager
-            // and avoids IndexOutOfRange exceptions when the underlying list changes.
+            // Initialize BindingSource and BindingList once and bind now.  
+            // We will mutate the BindingList contents later instead of reassigning DataSource,
+            // which avoids CurrencyManager/DataGridView index races during startup and UI events.
             _bindingSource = new BindingSource();
+            _bindingList = new BindingList<InventoryItem>();
+            _bindingSource.DataSource = _bindingList;
             dgvInventory.DataSource = _bindingSource;
 
             dgvInventory.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
@@ -353,20 +364,20 @@ namespace InventoryPOS
             {
                 CreateColumn("Status", "Status", 50, true),
                 CreateColumn("SKU", "SKU", 100, true),
-                CreateColumn("Brand", "Brand", 100, false),
-                CreateColumn("Category", "Category", 120, false),
-                CreateColumn("SubCategory", "Sub Category", 120, false),
-                CreateColumn("ListingPrice", "Listing Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("COG", "COG", 50, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("SoldPrice", "Sold Price", 50, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("Condition", "Condition", 100, false),
-                CreateColumn("Title", "Title", 200, false),
-                CreateColumn("Description", "Description", 250, false),
-                CreateColumn("Quantity", "Qty", 25, false, DataGridViewContentAlignment.MiddleCenter),
-                CreateColumn("Size", "Size", 50, false),
-                CreateColumn("Colors", "Colors", 100, false),
-                CreateColumn("ListingPlatform", "Listing Platform", 100, false)
-                ,CreateColumn("CreatedAt", "Created", 50, false, DataGridViewContentAlignment.MiddleCenter, "g")
+                CreateColumn("Brand", "Brand", 100, true),
+                CreateColumn("Category", "Category", 120, true),
+                CreateColumn("SubCategory", "Sub Category", 120, true),
+                CreateColumn("ListingPrice", "Listing Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("COG", "COG", 50, true, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("SoldPrice", "Sold Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("Condition", "Condition", 100, true),
+                CreateColumn("Title", "Title", 100, false),
+                CreateColumn("Description", "Description", 100, false),
+                CreateColumn("Quantity", "Qty", 25, true, DataGridViewContentAlignment.MiddleCenter),
+                CreateColumn("Size", "Size", 50, true),
+                CreateColumn("Colors", "Colors", 100, true),
+                CreateColumn("ListingPlatform", "Listing Platform", 100, true),
+                CreateColumn("CreatedAt", "Created", 50, true, DataGridViewContentAlignment.MiddleCenter, "g")
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;
@@ -374,6 +385,7 @@ namespace InventoryPOS
             dgvInventory.CellDoubleClick += DgvInventory_CellDoubleClick;
             dgvInventory.KeyDown += DgvInventory_KeyDown;
             dgvInventory.DataError += DgvInventory_DataError;
+            dgvInventory.ColumnHeaderMouseClick += DgvInventory_ColumnHeaderMouseClick;
             dgvInventory.CurrentCellChanged += DgvInventory_CurrentCellChanged;
 
             // Forces the last column to stretch and fill the remaining white space
@@ -381,6 +393,14 @@ namespace InventoryPOS
             this.Controls.Add(dgvInventory);
 
             dgvInventory.BringToFront();
+            // Remember original header texts for filter indicator updates
+            _originalHeaderTexts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataGridViewColumn c in dgvInventory.Columns)
+            {
+                if (!string.IsNullOrEmpty(c.DataPropertyName) && !_originalHeaderTexts.ContainsKey(c.DataPropertyName))
+                    _originalHeaderTexts[c.DataPropertyName] = c.HeaderText;
+            }
+
             // Initialize header styles to avoid header color change when cells are selected
             ResetHeaderStyles();
         }
@@ -399,6 +419,235 @@ namespace InventoryPOS
             ResetHeaderStyles();
         }
 
+        private void DgvInventory_ColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            if (e.ColumnIndex < 0) return;
+            var col = dgvInventory.Columns[e.ColumnIndex];
+            var propName = col.DataPropertyName;
+            if (string.IsNullOrEmpty(propName)) return;
+
+            if (e.Button == MouseButtons.Left)
+            {
+                // Toggle sort
+                ToggleSort(propName);
+            }
+            else if (e.Button == MouseButtons.Right)
+            {
+                // Show filter menu with distinct values
+                var menu = new ContextMenuStrip();
+                var clearItem = new ToolStripMenuItem("Clear Filter");
+                clearItem.Click += (s, ev) =>
+                {
+                    _currentFilterColumn = null;
+                    _currentFilterValue = null;
+                    // Defer rebinding until after the header click processing finishes to avoid CurrencyManager races
+                    this.BeginInvoke((Action)(() =>
+                    {
+                        // Restore pre-filter display if available, otherwise show master list
+                        var restore = _preFilterDisplay != null && _preFilterDisplay.Count > 0 ? _preFilterDisplay : (_displayList.Count > 0 ? _displayList : _allItems);
+                        _displayList = restore.ToList();
+                        BindGrid(_displayList);
+                        UpdateCount(_displayList);
+                        lblStatus.Text = "Filter cleared";
+                        UpdateFilterIndicator();
+
+                        // persist UI state
+                        var ui = new UiState
+                        {
+                            SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                            SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                            FilterColumn = null,
+                            FilterValue = null
+                        };
+                        _ = _repository.SaveUiStateAsync(ui);
+                    }));
+                };
+                menu.Items.Add(clearItem);
+                menu.Items.Add(new ToolStripSeparator());
+
+                var values = _allItems
+                    .Select(i => GetPropertyValue(i, propName)?.ToString() ?? string.Empty)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(v => v)
+                    .ToList();
+
+                foreach (var v in values.Take(100))
+                {
+                    var item = new ToolStripMenuItem(string.IsNullOrEmpty(v) ? "(blank)" : v);
+                    item.Click += (s, ev) =>
+                    {
+                        _currentFilterColumn = propName;
+                        _currentFilterValue = v;
+                        ApplyColumnFilter(propName, v);
+                    };
+                    menu.Items.Add(item);
+                }
+
+                menu.Show(Cursor.Position);
+            }
+        }
+
+        private void ToggleSort(string propName)
+        {
+            // Toggle between Ascending/Descending/None
+            _sortStates.TryGetValue(propName, out var state);
+            SortOrder next;
+            if (state == SortOrder.None) next = SortOrder.Ascending;
+            else if (state == SortOrder.Ascending) next = SortOrder.Descending;
+            else next = SortOrder.None;
+
+            // clear other sorts; only store if next is not None
+            _sortStates.Clear();
+            if (next != SortOrder.None)
+                _sortStates[propName] = next;
+
+            // Determine current source list (display list if available)
+            var source = (_displayList != null && _displayList.Count > 0) ? _displayList.ToList() : _allItems.ToList();
+
+            // If user is starting a new sort, save the current display ordering so we can restore it
+            if (next != SortOrder.None)
+            {
+                _lastDisplayBeforeSort = source.ToList();
+            }
+
+            if (next == SortOrder.None)
+            {
+                // Restore previous displayed order if available, otherwise show master list
+                if (_lastDisplayBeforeSort != null)
+                {
+                    BindGrid(_lastDisplayBeforeSort);
+                    UpdateCount(_lastDisplayBeforeSort);
+                }
+                else
+                {
+                    BindGrid(_displayList.Count > 0 ? _displayList : _allItems);
+                    UpdateCount(_displayList.Count > 0 ? _displayList : _allItems);
+                }
+
+                UpdateSortGlyphs();
+                lblStatus.Text = "Sort cleared";
+                return;
+            }
+
+            var asc = next == SortOrder.Ascending;
+            var sorted = asc
+                ? source.OrderBy(i => GetPropertyValue(i, propName) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList()
+                : source.OrderByDescending(i => GetPropertyValue(i, propName) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList();
+
+            // Defer rebinding to avoid header click processing races
+            this.BeginInvoke((Action)(() =>
+            {
+                BindGrid(sorted);
+                UpdateCount(sorted);
+                UpdateSortGlyphs();
+                lblStatus.Text = $"Sorted by {propName} ({(asc ? "asc" : "desc")})";
+
+                // persist UI state
+                var ui = new UiState
+                {
+                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue
+                };
+                _ = _repository.SaveUiStateAsync(ui);
+            }));
+        }
+
+        private void ApplyColumnFilter(string propName, string? value)
+        {
+            if (string.IsNullOrEmpty(propName)) return;
+            // Capture current display before applying a filter so Clear Filter can restore it
+            if (_preFilterDisplay == null || _preFilterDisplay.Count == 0)
+            {
+                _preFilterDisplay = _displayList != null && _displayList.Count > 0 ? _displayList.ToList() : _allItems.ToList();
+            }
+            var filtered = _allItems.Where(i => string.Equals(GetPropertyValue(i, propName)?.ToString() ?? string.Empty, value ?? string.Empty, StringComparison.OrdinalIgnoreCase)).ToList();
+            // Update current display list and show filter indicator
+            _currentFilterColumn = propName;
+            _currentFilterValue = value;
+            // Defer the actual rebind to avoid interfering with header mouse handling
+            this.BeginInvoke((Action)(() =>
+            {
+                _displayList = filtered;
+                BindGrid(_displayList);
+                UpdateCount(_displayList);
+                lblStatus.Text = $"Filtered {propName} = '{value}' ({_displayList.Count} items)";
+                UpdateFilterIndicator();
+
+                // persist UI state
+                var ui = new UiState
+                {
+                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue
+                };
+                _ = _repository.SaveUiStateAsync(ui);
+            }));
+        }
+
+        private void UpdateFilterIndicator()
+        {
+            if (lblFilterIndicator == null) return;
+
+            if (!string.IsNullOrEmpty(_currentFilterColumn))
+            {
+                var display = _currentFilterColumn == "Search"
+                    ? $"Search: '{_currentFilterValue}'"
+                    : $"Filter: {_currentFilterColumn} = '{_currentFilterValue}'";
+                lblFilterIndicator.Text = display;
+                // Add header text suffix to indicate which column is filtered
+                try
+                {
+                    foreach (DataGridViewColumn col in dgvInventory.Columns)
+                    {
+                        if (string.Equals(col.DataPropertyName, _currentFilterColumn, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var orig = _originalHeaderTexts.ContainsKey(col.DataPropertyName) ? _originalHeaderTexts[col.DataPropertyName] : col.HeaderText;
+                            col.HeaderText = orig + " (filtered)";
+                        }
+                        else
+                        {
+                            if (!string.IsNullOrEmpty(col.DataPropertyName) && _originalHeaderTexts.ContainsKey(col.DataPropertyName))
+                                col.HeaderText = _originalHeaderTexts[col.DataPropertyName];
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore header update failures
+                }
+            }
+            else
+            {
+                lblFilterIndicator.Text = string.Empty;
+                // restore original header texts
+                try
+                {
+                    foreach (DataGridViewColumn col in dgvInventory.Columns)
+                    {
+                        if (!string.IsNullOrEmpty(col.DataPropertyName) && _originalHeaderTexts.ContainsKey(col.DataPropertyName))
+                            col.HeaderText = _originalHeaderTexts[col.DataPropertyName];
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private object? GetPropertyValue(InventoryItem item, string propName)
+        {
+            try
+            {
+                var prop = typeof(InventoryItem).GetProperty(propName);
+                return prop?.GetValue(item);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private void ResetHeaderStyles()
         {
             if (dgvInventory == null || dgvInventory.Columns == null) return;
@@ -410,10 +659,49 @@ namespace InventoryPOS
                 col.HeaderCell.Style.ForeColor = _headerForeColor;
                 col.HeaderCell.Style.SelectionBackColor = _headerBackColor;
                 col.HeaderCell.Style.SelectionForeColor = _headerForeColor;
+                // Clear any existing sort glyph (UpdateSortGlyphs will set the correct one)
+                if (col.HeaderCell is DataGridViewColumnHeaderCell hdr)
+                {
+                    hdr.SortGlyphDirection = SortOrder.None;
+                }
             }
 
             // Force a repaint so header changes take effect immediately
             dgvInventory.Refresh();
+        }
+
+        private void UpdateSortGlyphs()
+        {
+            if (dgvInventory == null || dgvInventory.Columns == null) return;
+
+            // Clear all glyphs first
+            foreach (DataGridViewColumn col in dgvInventory.Columns)
+            {
+                if (col.HeaderCell is DataGridViewColumnHeaderCell hdr)
+                    hdr.SortGlyphDirection = SortOrder.None;
+            }
+
+            // If we have a single active sort state, apply its glyph
+            if (_sortStates.Count == 1)
+            {
+                var kv = _sortStates.First();
+                var propName = kv.Key;
+                var sortOrder = kv.Value;
+                if (sortOrder == SortOrder.None) return;
+
+                // Find the column with matching DataPropertyName
+                foreach (DataGridViewColumn col in dgvInventory.Columns)
+                {
+                    if (string.Equals(col.DataPropertyName, propName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (col.HeaderCell is DataGridViewColumnHeaderCell hdr)
+                        {
+                            hdr.SortGlyphDirection = sortOrder;
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         private DataGridViewColumn CreateColumn(string dataPropertyName, string headerText, int width, bool autoSize = false, DataGridViewContentAlignment alignment = DataGridViewContentAlignment.MiddleLeft, string? format = null)
@@ -461,7 +749,13 @@ namespace InventoryPOS
                 BorderStyle = Border3DStyle.Etched
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblCount, lblTotalCOG });
+            lblFilterIndicator = new ToolStripStatusLabel(string.Empty)
+            {
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.DarkBlue
+            };
+
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG });
             this.Controls.Add(statusStrip);
         }
 
@@ -476,9 +770,61 @@ namespace InventoryPOS
             {
                 lblStatus.Text = "Loading...";
                 _allItems = await _repository.GetAllAsync();
-                BindGrid(_allItems);
+                // Initialize display list and bind
+                _displayList = _allItems.ToList();
+                BindGrid(_displayList);
                 lblStatus.Text = "Ready";
                 UpdateCount();
+
+                // Load UI state (sort/filter) and apply asynchronously to avoid interfering with layout/event processing
+                var ui = await _repository.LoadUiStateAsync();
+                if (ui != null)
+                {
+                    this.BeginInvoke((Action)(() =>
+                    {
+                        try
+                        {
+                            // apply filter first if present
+                            if (!string.IsNullOrEmpty(ui.FilterColumn))
+                            {
+                                _currentFilterColumn = ui.FilterColumn;
+                                _currentFilterValue = ui.FilterValue;
+                                if (ui.FilterColumn == "Search")
+                                {
+                                    txtSearch.Text = ui.FilterValue ?? string.Empty;
+                                    PerformSearch();
+                                }
+                                else
+                                {
+                                    ApplyColumnFilter(ui.FilterColumn, ui.FilterValue);
+                                }
+                            }
+
+                            // apply saved sort
+                            if (!string.IsNullOrEmpty(ui.SortColumn) && !string.IsNullOrEmpty(ui.SortOrder))
+                            {
+                                var ord = ui.SortOrder == "Ascending" ? SortOrder.Ascending : SortOrder.Descending;
+                                _sortStates.Clear();
+                                _sortStates[ui.SortColumn] = ord;
+
+                                // Apply sort to current display list
+                                var source = (_displayList != null && _displayList.Count > 0) ? _displayList.ToList() : _allItems.ToList();
+                                var asc = ord == SortOrder.Ascending;
+                                var sorted = asc
+                                    ? source.OrderBy(i => GetPropertyValue(i, ui.SortColumn) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList()
+                                    : source.OrderByDescending(i => GetPropertyValue(i, ui.SortColumn) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList();
+
+                                BindGrid(sorted);
+                                UpdateCount(sorted);
+                                UpdateSortGlyphs();
+                            }
+                        }
+                        catch
+                        {
+                            // ignore UI apply failures
+                        }
+                    }));
+                }
             }
             catch (Exception ex)
             {
@@ -489,19 +835,47 @@ namespace InventoryPOS
 
         private void BindGrid(List<InventoryItem> items)
         {
-            // Keep master list reference
-            _allItems = items;
+            // Keep an in-memory display list reference
+            _displayList = items ?? new List<InventoryItem>();
 
-            if (_bindingSource == null)
+            if (_bindingList == null)
             {
-                _bindingSource = new BindingSource();
+                _bindingList = new BindingList<InventoryItem>();
             }
 
-            // Create a BindingList so removals/updates notify the grid safely
-            _bindingList = new BindingList<InventoryItem>(_allItems);
-            _bindingSource.DataSource = _bindingList;
-            dgvInventory.DataSource = _bindingSource;
+            // Update existing BindingList contents safely to avoid resetting DataSource during UI events
+            try
+            {
+                // Prevent the grid from processing input/layout while we update the list
+                dgvInventory.SuspendLayout();
+                try { dgvInventory.Enabled = false; } catch { }
+
+                _bindingList.RaiseListChangedEvents = false;
+                _bindingList.Clear();
+                foreach (var it in _displayList)
+                {
+                    _bindingList.Add(it);
+                }
+            }
+            finally
+            {
+                _bindingList.RaiseListChangedEvents = true;
+                try
+                {
+                    _bindingSource?.ResetBindings(false);
+                }
+                catch
+                {
+                    // ResetBindings may throw if grid is in an odd state; ignore to avoid crashing the UI
+                }
+
+                try { dgvInventory.Enabled = true; } catch { }
+                dgvInventory.ResumeLayout();
+            }
+
+            try { dgvInventory.CurrentCell = null; } catch { }
             dgvInventory.ClearSelection();
+            UpdateSortGlyphs();
         }
 
         private void UpdateCount()
@@ -631,7 +1005,19 @@ namespace InventoryPOS
             var searchText = txtSearch.Text?.Trim().ToLower();
             if (string.IsNullOrEmpty(searchText))
             {
-                BindGrid(_allItems);
+                // clear search filter
+                _currentFilterColumn = null;
+                _currentFilterValue = null;
+                _displayList = _allItems.ToList();
+                BindGrid(_displayList);
+                UpdateFilterIndicator();
+
+                // persist UI state
+                var uiClear = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = null,
+                    FilterValue = null };
+                _ = _repository.SaveUiStateAsync(uiClear);
                 return;
             }
 
@@ -648,9 +1034,25 @@ namespace InventoryPOS
                 (item.Colors?.ToLower().Contains(searchText) ?? false)
             ).ToList();
 
-            BindGrid(filtered);
-            UpdateCount(filtered);
-            lblStatus.Text = $"Found {filtered.Count} of {_allItems.Count} items";
+            // mark as search filter
+            _currentFilterColumn = "Search";
+            _currentFilterValue = searchText;
+            _displayList = filtered;
+            // defer rebind to avoid interfering with key processing
+            this.BeginInvoke((Action)(() =>
+            {
+                BindGrid(_displayList);
+                UpdateCount(_displayList);
+                lblStatus.Text = $"Found {_displayList.Count} of {_allItems.Count} items";
+                UpdateFilterIndicator();
+
+                // persist UI state
+                var ui = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue };
+                _ = _repository.SaveUiStateAsync(ui);
+            }));
         }
 
         private void AddNewItem()
@@ -736,37 +1138,95 @@ namespace InventoryPOS
             try
             {
                 lblStatus.Text = "Deleting...";
+
+                // Capture the selected row index so we can remove by index later on the UI thread.
+                var selectedRowIndex = -1;
+                try
+                {
+                    if (dgvInventory.SelectedRows.Count > 0)
+                        selectedRowIndex = dgvInventory.SelectedRows[0].Index;
+                }
+                catch { }
+
+                var idToRemove = selectedItem.Id;
+
                 // Await repository deletion so we don't race with UI events.
-                await _repository.DeleteAsync(selectedItem.Id);
+                await _repository.DeleteAsync(idToRemove);
 
                 // Defer UI updates until after current mouse/event processing completes to avoid
                 // CurrencyManager / DataGridView races (Index out of range).
                 this.BeginInvoke((Action)(() =>
                 {
+                    // Temporarily disable UI updates on the grid while we remove the row
+                    try { dgvInventory.SuspendLayout(); } catch { }
+                    try { dgvInventory.Enabled = false; } catch { }
+
                     try
                     {
                         // Clear current cell to avoid DataGridView trying to access the removed row
-                        if (dgvInventory.CurrentCell != null)
+                        try
                         {
-                            dgvInventory.CurrentCell = null;
+                            if (dgvInventory.CurrentCell != null)
+                            {
+                                dgvInventory.CurrentCell = null;
+                            }
                         }
+                        catch { /* ignore */ }
+
+                        // Try to remove by the previously-captured index first (fast and consistent with current view)
+                        var removed = false;
+                        if (selectedRowIndex >= 0 && _bindingList != null && selectedRowIndex < _bindingList.Count)
+                        {
+                            try
+                            {
+                                _bindingList.RemoveAt(selectedRowIndex);
+                                removed = true;
+                            }
+                            catch { removed = false; }
+                        }
+
+                        // Fallback: remove by Id if index removal failed
+                        if (!removed && _bindingList != null)
+                        {
+                            var match = _bindingList.FirstOrDefault(x => x.Id == idToRemove);
+                            if (match != null)
+                            {
+                                _bindingList.Remove(match);
+                                removed = true;
+                            }
+                        }
+
+                        // Keep master list and display lists in sync
+                        _allItems.RemoveAll(i => i.Id == idToRemove);
+                        if (_displayList != null && _displayList.Any())
+                            _displayList.RemoveAll(i => i.Id == idToRemove);
+                        if (_preFilterDisplay != null && _preFilterDisplay.Any())
+                            _preFilterDisplay.RemoveAll(i => i.Id == idToRemove);
+
+                        // If nothing removed above, rebind as a final fallback
+                        if (!removed)
+                        {
+                            try { BindGrid(_allItems); } catch { }
+                        }
+
+                        UpdateCount();
+                        lblStatus.Text = "Item deleted";
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // ignore
+                        // If anything goes wrong updating the UI, show a non-fatal message and refresh the whole grid as a fallback
+                        try
+                        {
+                            BindGrid(_allItems);
+                            UpdateCount();
+                        }
+                        catch { }
+                        lblStatus.Text = "Error updating UI after delete";
+                        MessageBox.Show($"Deleted from storage but failed to update grid: {ex.Message}", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
 
-                    // Remove from binding list so grid updates safely.
-                    if (_bindingList != null && _bindingList.Contains(selectedItem))
-                    {
-                        _bindingList.Remove(selectedItem);
-                    }
-
-                    // Keep master list in sync
-                    _allItems.RemoveAll(i => i.Id == selectedItem.Id);
-
-                    UpdateCount();
-                    lblStatus.Text = "Item deleted";
+                    try { dgvInventory.Enabled = true; } catch { }
+                    try { dgvInventory.ResumeLayout(); } catch { }
                 }));
             }
             catch (Exception ex)

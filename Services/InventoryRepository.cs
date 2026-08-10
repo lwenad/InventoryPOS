@@ -112,5 +112,43 @@ namespace InventoryPOS.Services
             var items = await GetAllAsync();
             return items.Find(i => i.Id == id);
         }
+
+        // UI state persistence (separate JSON alongside app data)
+        private string GetUiStatePath()
+        {
+            var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var appFolder = Path.Combine(appDataPath, "InventoryPOS");
+            Directory.CreateDirectory(appFolder);
+            return Path.Combine(appFolder, "ui_state.json");
+        }
+
+        public async Task SaveUiStateAsync(UiState state)
+        {
+            try
+            {
+                var path = GetUiStatePath();
+                var json = JsonSerializer.Serialize(state, _jsonOptions);
+                await File.WriteAllTextAsync(path, json);
+            }
+            catch
+            {
+                // ignore UI save errors
+            }
+        }
+
+        public async Task<UiState?> LoadUiStateAsync()
+        {
+            try
+            {
+                var path = GetUiStatePath();
+                if (!File.Exists(path)) return null;
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<UiState>(json, _jsonOptions);
+            }
+            catch
+            {
+                return null;
+            }
+        }
     }
 }
