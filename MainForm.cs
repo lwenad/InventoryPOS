@@ -341,12 +341,14 @@ namespace InventoryPOS
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
             {
+                CreateColumn("Status", "Status", 100, false),
                 CreateColumn("SKU", "SKU", 100, false),
                 CreateColumn("Brand", "Brand", 120, false),
                 CreateColumn("Category", "Category", 120, false),
                 CreateColumn("SubCategory", "Sub Category", 120, false),
                 CreateColumn("ListingPrice", "Listing Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("COG", "COG", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("SoldPrice", "Sold Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("Condition", "Condition", 100, false),
                 CreateColumn("Title", "Title", 200, false),
                 CreateColumn("Description", "Description", 250, false),
@@ -357,6 +359,7 @@ namespace InventoryPOS
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;
+            dgvInventory.CellFormatting += DgvInventory_CellFormatting;
             dgvInventory.CellDoubleClick += DgvInventory_CellDoubleClick;
             dgvInventory.KeyDown += DgvInventory_KeyDown;
             dgvInventory.CurrentCellChanged += DgvInventory_CurrentCellChanged;
@@ -489,6 +492,34 @@ namespace InventoryPOS
             var hasSelection = dgvInventory.SelectedRows.Count > 0;
             btnEdit.Enabled = hasSelection;
             btnDelete.Enabled = hasSelection;
+        }
+
+        private void DgvInventory_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+        {
+            try
+            {
+                if (e.Value == null) return;
+
+                var col = dgvInventory.Columns[e.ColumnIndex];
+                // Color the Status text green when item is Sold
+                if (string.Equals(col.DataPropertyName, "Status", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (e.Value.ToString() == "Sold")
+                    {
+                        e.CellStyle.ForeColor = Color.Green;
+                        e.CellStyle.SelectionForeColor = Color.Green;
+                    }
+                    else
+                    {
+                        e.CellStyle.ForeColor = Color.Black;
+                        e.CellStyle.SelectionForeColor = Color.Black;
+                    }
+                }
+            }
+            catch
+            {
+                // ignore formatting errors
+            }
         }
 
         private void DgvInventory_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)

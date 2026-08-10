@@ -29,6 +29,8 @@ namespace InventoryPOS.Forms
         private Button btnSave = null!;
         private Button btnCancel = null!;
         private ComboBox cmbCondition = null!;
+        private ComboBox cmbStatus = null!;
+        private NumericUpDown numSoldPrice = null!;
 
         public InventoryItem ResultItem { get; private set; } = null!;
 
@@ -148,6 +150,20 @@ namespace InventoryPOS.Forms
             mainPanel.Controls.Add(cmbCondition);
             y += spacing;
 
+            // Status
+            AddLabel("Status", 20, y, labelWidth);
+            cmbStatus = new ComboBox
+            {
+                Location = new Point(130, y),
+                Size = new Size(controlWidth, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbStatus.Items.AddRange(new[] { "Created", "Sold" });
+            cmbStatus.SelectedIndex = 0; // default to Created
+            cmbStatus.SelectedIndexChanged += CmbStatus_SelectedIndexChanged;
+            mainPanel.Controls.Add(cmbStatus);
+            y += spacing;
+
             // Brand
             AddLabel("Brand", 20, y, labelWidth);
             txtBrand = AddTextBox(130, y, controlWidth);
@@ -166,6 +182,16 @@ namespace InventoryPOS.Forms
             // COG
             AddLabel("COG", 20, y, labelWidth);
             numCOG = AddNumericUpDown(130, y, 150, 0, 999999, 2);
+            y += spacing;
+
+            // Sold Price
+            AddLabel("Sold Price", 20, y, labelWidth);
+            var tempSold = AddNumericUpDown(130, y, 150, 0, 999999, 2);
+            // keep a named field reference
+            numSoldPrice = tempSold;
+            numSoldPrice.DecimalPlaces = 2;
+            numSoldPrice.Enabled = false; // default disabled until Status == Sold
+            mainPanel.Controls.Add(numSoldPrice);
             y += spacing;
 
             // SKU
@@ -271,6 +297,12 @@ namespace InventoryPOS.Forms
             else
                 cmbCondition.SelectedIndex = -1;
 
+            // Status
+            if (!string.IsNullOrWhiteSpace(_item.Status) && cmbStatus.Items.Contains(_item.Status))
+                cmbStatus.SelectedItem = _item.Status;
+            else
+                cmbStatus.SelectedIndex = 0; // default Created
+
             txtBrand.Text = _item.Brand;
             txtColors.Text = _item.Colors;
             numListingPrice.Value = Math.Min(Math.Max(_item.ListingPrice, numListingPrice.Minimum), numListingPrice.Maximum);
@@ -290,6 +322,17 @@ namespace InventoryPOS.Forms
                     }
                 }
             }
+
+            // Load sold price and enable/disable control based on status
+            numSoldPrice.Value = Math.Min(Math.Max(_item.SoldPrice, numSoldPrice.Minimum), numSoldPrice.Maximum);
+            // Ensure sold price control reflects the current selected status (in case Status combobox was set above)
+            numSoldPrice.Enabled = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void CmbStatus_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            var isSold = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
+            numSoldPrice.Enabled = isSold;
         }
 
         private void BtnSave_Click(object? sender, EventArgs e)
@@ -318,6 +361,8 @@ namespace InventoryPOS.Forms
                 Quantity = (int)numQuantity.Value,
                 Size = txtSize.Text.Trim(),
                 Condition = cmbCondition.SelectedItem?.ToString() ?? string.Empty, // Use ComboBox value
+                    Status = cmbStatus.SelectedItem?.ToString() ?? "Created",
+                    SoldPrice = numSoldPrice.Value,
                 Brand = txtBrand.Text.Trim(),
                 Colors = txtColors.Text.Trim(),
                 ListingPrice = numListingPrice.Value,

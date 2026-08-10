@@ -36,8 +36,14 @@ namespace InventoryPOS.Models
 
         public string ListingPlatform { get; set; } = string.Empty;
 
+        // Status of the item (e.g., Created, Sold)
+        public string Status { get; set; } = "Created";
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+        // Price at which the item was sold (if applicable)
+        public decimal SoldPrice { get; set; } = 0m;
     }
 }
