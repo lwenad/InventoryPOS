@@ -47,5 +47,10 @@ namespace InventoryPOS.Models
         public decimal SoldPrice { get; set; } = 0m;
         // Date when the item was sold (date-only). Null when not sold.
         public DateTime? SoldDate { get; set; } = null;
+        // Earnings (selling revenue) for sold item
+        public decimal Earnings { get; set; } = 0m;
+
+        // Profit = Earnings - COG when sold, otherwise 0
+        public decimal Profit => string.Equals(Status, "Sold", StringComparison.OrdinalIgnoreCase) ? (Earnings - COG) : 0m;
     }
 }

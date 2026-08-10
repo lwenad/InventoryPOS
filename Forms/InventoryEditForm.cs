@@ -33,6 +33,7 @@ namespace InventoryPOS.Forms
         private ComboBox cmbStatus = null!;
         private NumericUpDown numSoldPrice = null!;
         private DateTimePicker dtSoldDate = null!;
+        private NumericUpDown numEarnings = null!;
 
         public InventoryItem ResultItem { get; private set; } = null!;
 
@@ -216,6 +217,15 @@ namespace InventoryPOS.Forms
             mainPanel.Controls.Add(numSoldPrice);
             y += spacing;
 
+            // Earnings (revenue)
+            AddLabel("Earnings", 20, y, labelWidth);
+            var tempEarnings = AddNumericUpDown(130, y, 150, 0, 999999, 2);
+            numEarnings = tempEarnings;
+            numEarnings.DecimalPlaces = 2;
+            numEarnings.Enabled = false; // enabled when Status == Sold
+            mainPanel.Controls.Add(numEarnings);
+            y += spacing;
+
             // Sold Date
             AddLabel("Sold Date", 20, y, labelWidth);
             dtSoldDate = new DateTimePicker
@@ -389,9 +399,12 @@ namespace InventoryPOS.Forms
 
             // Load sold price and enable/disable controls based on status
             numSoldPrice.Value = Math.Min(Math.Max(_item.SoldPrice, numSoldPrice.Minimum), numSoldPrice.Maximum);
+            // Load earnings
+            numEarnings.Value = Math.Min(Math.Max(_item.Earnings, numEarnings.Minimum), numEarnings.Maximum);
             var isSold = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
             // Ensure sold price and sold date controls reflect the current selected status
             numSoldPrice.Enabled = isSold;
+            numEarnings.Enabled = isSold;
             if (_item.SoldDate.HasValue)
             {
                 try { dtSoldDate.Value = _item.SoldDate.Value.Date; } catch { dtSoldDate.Value = DateTime.Today; }
@@ -407,7 +420,8 @@ namespace InventoryPOS.Forms
         {
             var isSold = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase);
             numSoldPrice.Enabled = isSold;
-            // If status is Sold, enable sold date and set to today if not present
+            // If status is Sold, enable earnings and sold date and set to today if not present
+            numEarnings.Enabled = isSold;
             dtSoldDate.Enabled = isSold;
             if (isSold)
             {
@@ -471,13 +485,22 @@ namespace InventoryPOS.Forms
                 return;
             }
 
-            // If status is Sold, ensure a sold price is provided (> 0)
+            // If status is Sold, ensure a sold price and earnings are provided (> 0)
             var selectedStatus = cmbStatus.SelectedItem?.ToString() ?? string.Empty;
-            if (string.Equals(selectedStatus, "Sold", StringComparison.OrdinalIgnoreCase) && numSoldPrice.Value <= 0m)
+            if (string.Equals(selectedStatus, "Sold", StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show("Sold items must have a Sold Price greater than 0.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                numSoldPrice.Focus();
-                return;
+                if (numSoldPrice.Value <= 0m)
+                {
+                    MessageBox.Show("Sold items must have a Sold Price greater than 0.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    numSoldPrice.Focus();
+                    return;
+                }
+                if (numEarnings.Value <= 0m)
+                {
+                    MessageBox.Show("Sold items must have Earnings greater than 0.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    numEarnings.Focus();
+                    return;
+                }
             }
 
             ResultItem = new InventoryItem
@@ -493,7 +516,8 @@ namespace InventoryPOS.Forms
                     : (cmbSize.SelectedItem?.ToString() ?? string.Empty),
                 Condition = cmbCondition.SelectedItem?.ToString() ?? string.Empty, // Use ComboBox value
                     Status = cmbStatus.SelectedItem?.ToString() ?? "Created",
-                    SoldPrice = numSoldPrice.Value,
+                SoldPrice = numSoldPrice.Value,
+                Earnings = numEarnings.Value,
                 SoldDate = string.Equals(cmbStatus.SelectedItem?.ToString(), "Sold", StringComparison.OrdinalIgnoreCase) ? dtSoldDate.Value.Date : (DateTime?)null,
                 Brand = txtBrand.Text.Trim(),
                 Colors = txtColors.Text.Trim(),
