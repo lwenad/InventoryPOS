@@ -59,6 +59,8 @@ namespace InventoryPOS
             this.Name = "MainForm";
             this.Text = "InventoryPOS - Clothing Inventory for Resale";
             this.StartPosition = FormStartPosition.CenterScreen;
+            // Start maximized to use full screen on startup
+            this.WindowState = FormWindowState.Maximized;
             this.Load += MainForm_Load;
 
             CreateMenuStrip();
@@ -349,21 +351,22 @@ namespace InventoryPOS
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
             {
-                CreateColumn("Status", "Status", 100, false),
-                CreateColumn("SKU", "SKU", 100, false),
-                CreateColumn("Brand", "Brand", 120, false),
+                CreateColumn("Status", "Status", 50, true),
+                CreateColumn("SKU", "SKU", 100, true),
+                CreateColumn("Brand", "Brand", 100, false),
                 CreateColumn("Category", "Category", 120, false),
                 CreateColumn("SubCategory", "Sub Category", 120, false),
                 CreateColumn("ListingPrice", "Listing Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("COG", "COG", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("SoldPrice", "Sold Price", 100, false, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("COG", "COG", 50, false, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("SoldPrice", "Sold Price", 50, false, DataGridViewContentAlignment.MiddleRight, "C2"),
                 CreateColumn("Condition", "Condition", 100, false),
                 CreateColumn("Title", "Title", 200, false),
                 CreateColumn("Description", "Description", 250, false),
-                CreateColumn("Quantity", "Qty", 60, false, DataGridViewContentAlignment.MiddleCenter),
-                CreateColumn("Size", "Size", 80, false),
-                CreateColumn("Colors", "Colors", 120, false),
+                CreateColumn("Quantity", "Qty", 25, false, DataGridViewContentAlignment.MiddleCenter),
+                CreateColumn("Size", "Size", 50, false),
+                CreateColumn("Colors", "Colors", 100, false),
                 CreateColumn("ListingPlatform", "Listing Platform", 100, false)
+                ,CreateColumn("CreatedAt", "Created", 50, false, DataGridViewContentAlignment.MiddleCenter, "g")
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;

@@ -294,6 +294,8 @@ namespace InventoryPOS.Forms
             // Set ComboBox selection for Condition
             if (!string.IsNullOrWhiteSpace(_item.Condition) && cmbCondition.Items.Contains(_item.Condition))
                 cmbCondition.SelectedItem = _item.Condition;
+            else if (_isNew)
+                cmbCondition.SelectedItem = "Pre-owned - Excellent"; // default for new items
             else
                 cmbCondition.SelectedIndex = -1;
 
@@ -321,6 +323,12 @@ namespace InventoryPOS.Forms
                         chkPlatform.SetItemChecked(index, true);
                     }
                 }
+            }
+            else if (_isNew)
+            {
+                // Default platform for new items
+                int poshIndex = chkPlatform.Items.IndexOf("Poshmark");
+                if (poshIndex >= 0) chkPlatform.SetItemChecked(poshIndex, true);
             }
 
             // Load sold price and enable/disable control based on status
@@ -369,7 +377,7 @@ namespace InventoryPOS.Forms
                 COG = numCOG.Value,
                 SKU = txtSKU.Text.Trim(),
                 ListingPlatform = string.Join(", ", chkPlatform.CheckedItems.Cast<string>()),
-                CreatedAt = _item.CreatedAt,
+                CreatedAt = _isNew ? DateTime.Now : _item.CreatedAt,
                 UpdatedAt = DateTime.Now
             };
 
