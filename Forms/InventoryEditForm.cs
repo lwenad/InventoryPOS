@@ -173,19 +173,7 @@ namespace InventoryPOS.Forms
             mainPanel.Controls.Add(cmbCondition);
             y += spacing;
 
-            // Status
-            AddLabel("Status", 20, y, labelWidth);
-            cmbStatus = new ComboBox
-            {
-                Location = new Point(130, y),
-                Size = new Size(controlWidth, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList
-            };
-            cmbStatus.Items.AddRange(new[] { "Created", "Sold" });
-            cmbStatus.SelectedIndex = 0; // default to Created
-            cmbStatus.SelectedIndexChanged += CmbStatus_SelectedIndexChanged;
-            mainPanel.Controls.Add(cmbStatus);
-            y += spacing;
+            // (Status control moved below Earnings)
 
             // Brand
             AddLabel("Brand", 20, y, labelWidth);
@@ -224,6 +212,20 @@ namespace InventoryPOS.Forms
             numEarnings.DecimalPlaces = 2;
             numEarnings.Enabled = false; // enabled when Status == Sold
             mainPanel.Controls.Add(numEarnings);
+            y += spacing;
+
+            // Status (moved here so it appears after Earnings)
+            AddLabel("Status", 20, y, labelWidth);
+            cmbStatus = new ComboBox
+            {
+                Location = new Point(130, y),
+                Size = new Size(controlWidth, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList
+            };
+            cmbStatus.Items.AddRange(new[] { "Created", "Sold" });
+            cmbStatus.SelectedIndex = 0; // default to Created
+            cmbStatus.SelectedIndexChanged += CmbStatus_SelectedIndexChanged;
+            mainPanel.Controls.Add(cmbStatus);
             y += spacing;
 
             // Sold Date

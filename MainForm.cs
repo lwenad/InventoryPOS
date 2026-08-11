@@ -156,6 +156,16 @@ namespace InventoryPOS
                 UpdateCount();
                 lblStatus.Text = $"Loaded {_allItems.Count} items from {Path.GetFileName(filePath)}";
                 this.Text = $"InventoryPOS - {Path.GetFileName(filePath)}";
+                // persist last opened file path to UI state
+                var ui = new UiState
+                {
+                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath
+                };
+                _ = _repository.SaveUiStateAsync(ui);
             }
             catch (Exception ex)
             {
@@ -176,6 +186,16 @@ namespace InventoryPOS
                 lblStatus.Text = "Saving...";
                 await _repository.SaveAllAsync(_allItems);
                 lblStatus.Text = $"Saved to {Path.GetFileName(_repository.CurrentFilePath)}";
+                // persist last used file path in UI state
+                var uiSaved = new UiState
+                {
+                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath
+                };
+                _ = _repository.SaveUiStateAsync(uiSaved);
             }
             catch (Exception ex)
             {
@@ -209,6 +229,16 @@ namespace InventoryPOS
                 _repository.SetFilePath(filePath);
                 lblStatus.Text = $"Saved to {Path.GetFileName(filePath)}";
                 this.Text = $"InventoryPOS - {Path.GetFileName(filePath)}";
+                // persist last used file path in UI state after Save As
+                var ui = new UiState
+                {
+                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                    FilterColumn = _currentFilterColumn,
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath
+                };
+                _ = _repository.SaveUiStateAsync(ui);
             }
             catch (Exception ex)
             {
@@ -553,7 +583,8 @@ namespace InventoryPOS
                     SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
                     SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
                     FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath
                 };
                 _ = _repository.SaveUiStateAsync(ui);
             }));
@@ -586,7 +617,8 @@ namespace InventoryPOS
                     SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
                     SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
                     FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath
                 };
                 _ = _repository.SaveUiStateAsync(ui);
             }));
@@ -781,6 +813,14 @@ namespace InventoryPOS
             try
             {
                 lblStatus.Text = "Loading...";
+
+                // Load UI state first so we can restore the last used data file path before loading data
+                var ui = await _repository.LoadUiStateAsync();
+                if (ui != null && !string.IsNullOrEmpty(ui.LastFilePath) && System.IO.File.Exists(ui.LastFilePath))
+                {
+                    _repository.SetFilePath(ui.LastFilePath);
+                }
+
                 _allItems = await _repository.GetAllAsync();
                 // Initialize display list and bind
                 _displayList = _allItems.ToList();
@@ -789,7 +829,6 @@ namespace InventoryPOS
                 UpdateCount();
 
                 // Load UI state (sort/filter) and apply asynchronously to avoid interfering with layout/event processing
-                var ui = await _repository.LoadUiStateAsync();
                 if (ui != null)
                 {
                     this.BeginInvoke((Action)(() =>
@@ -1033,7 +1072,8 @@ namespace InventoryPOS
                 var uiClear = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
                     SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
                     FilterColumn = null,
-                    FilterValue = null };
+                    FilterValue = null,
+                    LastFilePath = _repository.CurrentFilePath };
                 _ = _repository.SaveUiStateAsync(uiClear);
                 return;
             }
@@ -1067,7 +1107,8 @@ namespace InventoryPOS
                 var ui = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
                     SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
                     FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue };
+                    FilterValue = _currentFilterValue,
+                    LastFilePath = _repository.CurrentFilePath };
                 _ = _repository.SaveUiStateAsync(ui);
             }));
         }

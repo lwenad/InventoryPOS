@@ -8,5 +8,6 @@ namespace InventoryPOS.Models
         public string? SortOrder { get; set; } // "Ascending" | "Descending" | null
         public string? FilterColumn { get; set; }
         public string? FilterValue { get; set; }
+        public string? LastFilePath { get; set; }
     }
 }
