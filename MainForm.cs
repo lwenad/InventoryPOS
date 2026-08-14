@@ -394,26 +394,26 @@ namespace InventoryPOS
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
             {
-                CreateColumn("Status", "Status", 50, true),
+                CreateColumn("Status", "Status", 50, false),
                 CreateColumn("SKU", "SKU", 100, true),
                 CreateColumn("Brand", "Brand", 100, true),
-                CreateColumn("Category", "Category", 120, true),
-                CreateColumn("SubCategory", "Sub Category", 120, true),
-                CreateColumn("ListingPrice", "Listing Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("COG", "COG", 50, true, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("SoldPrice", "Sold Price", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("Earnings", "Earnings", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
-                CreateColumn("Profit", "Profit", 100, true, DataGridViewContentAlignment.MiddleRight, "C2"),
+                CreateColumn("Category", "Category", 100, false),
+                CreateColumn("SubCategory", "Sub Category", 100, false),
+                CreateColumn("ListingPrice", "Listing Price", 25, true, DataGridViewContentAlignment.MiddleCenter, "C2"),
+                CreateColumn("COG", "COG", 25, true, DataGridViewContentAlignment.MiddleCenter, "C2"),
+                CreateColumn("SoldPrice", "Sold Price", 25, true, DataGridViewContentAlignment.MiddleCenter, "C2"),
+                CreateColumn("Earnings", "Earnings", 25, true, DataGridViewContentAlignment.MiddleCenter, "C2"),
+                CreateColumn("Profit", "Profit", 25, true, DataGridViewContentAlignment.MiddleCenter, "C2"),
                 CreateColumn("SoldDate", "Sold Date", 100, true, DataGridViewContentAlignment.MiddleCenter, "d"),
-                CreateColumn("Condition", "Condition", 100, true),
+                CreateColumn("Condition", "Condition", 50, true),
                 CreateColumn("Title", "Title", 100, false),
                 CreateColumn("Description", "Description", 100, false),
                 CreateColumn("Quantity", "Qty", 25, true, DataGridViewContentAlignment.MiddleCenter),
-                CreateColumn("Size", "Size", 50, true),
-                CreateColumn("Colors", "Colors", 100, true),
+                CreateColumn("Size", "Size", 25, true),
+                CreateColumn("Colors", "Colors", 50, true),
                 CreateColumn("ListingPlatform", "Listing Platform", 100, true),
                 // Show full date/time including seconds
-                CreateColumn("CreatedAt", "Created", 140, true, DataGridViewContentAlignment.MiddleCenter, "G")
+                CreateColumn("CreatedAt", "Created", 100, true, DataGridViewContentAlignment.MiddleCenter, "G")
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;
