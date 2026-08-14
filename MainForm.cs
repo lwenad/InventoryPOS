@@ -807,7 +807,7 @@ namespace InventoryPOS
                 ForeColor = Color.DarkBlue
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG, lblTotalProfit, lblTotalEarnings });
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG, lblTotalEarnings, lblTotalProfit });
             this.Controls.Add(statusStrip);
         }
 
