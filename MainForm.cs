@@ -38,6 +38,7 @@ namespace InventoryPOS
         private List<InventoryItem> _allItems = new();
         private ToolStripStatusLabel lblTotalCOG = null!;
         private ToolStripStatusLabel lblTotalProfit = null!;
+        private ToolStripStatusLabel lblTotalEarnings = null!;
         private Color _headerBackColor = Color.FromArgb(240, 240, 240);
         private Color _headerForeColor = Color.Black;
         private string? _currentFilterColumn;
@@ -793,13 +794,20 @@ namespace InventoryPOS
                 BorderStyle = Border3DStyle.Etched
             };
 
+            lblTotalEarnings = new ToolStripStatusLabel("Total Earnings: $0.00")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
             lblFilterIndicator = new ToolStripStatusLabel(string.Empty)
             {
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.DarkBlue
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG, lblTotalProfit });
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG, lblTotalProfit, lblTotalEarnings });
             this.Controls.Add(statusStrip);
         }
 
@@ -937,6 +945,8 @@ namespace InventoryPOS
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
             decimal totalProfit = items.Sum(i => i.Profit);
             lblTotalProfit.Text = $"Total Profit: {totalProfit:C2}";
+            decimal totalEarnings = items.Sum(i => i.Earnings);
+            lblTotalEarnings.Text = $"Total Earnings: {totalEarnings:C2}";
         }
 
         private void UpdateCount(List<InventoryItem> items)
@@ -946,6 +956,8 @@ namespace InventoryPOS
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
             decimal totalProfit = items.Sum(i => i.Profit);
             lblTotalProfit.Text = $"Total Profit: {totalProfit:C2}";
+            decimal totalEarnings = items.Sum(i => i.Earnings);
+            lblTotalEarnings.Text = $"Total Earnings: {totalEarnings:C2}";
         }
 
         private void DgvInventory_SelectionChanged(object? sender, EventArgs e)
