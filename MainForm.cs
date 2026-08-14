@@ -25,6 +25,7 @@ namespace InventoryPOS
         private ToolStripMenuItem menuFileSaveAs = null!;
         private ToolStripSeparator menuFileSep1 = null!;
         private ToolStripMenuItem menuFileExit = null!;
+        private ToolStripMenuItem menuProfitCalculator = null!;
         private ToolStrip toolStrip = null!;
         private ToolStripButton btnAdd = null!;
         private ToolStripButton btnEdit = null!;
@@ -126,6 +127,14 @@ namespace InventoryPOS
             });
 
             menuStrip.Items.Add(menuFile);
+
+            menuProfitCalculator = new ToolStripMenuItem("&Profit Calculator", null, MenuProfitCalculator_Click)
+            {
+                ShortcutKeys = Keys.Control | Keys.P,
+                ToolTipText = "Open profit calculator for eBay, Poshmark, and Depop"
+            };
+            menuStrip.Items.Add(menuProfitCalculator);
+
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
         }
@@ -251,6 +260,12 @@ namespace InventoryPOS
         private void MenuFileExit_Click(object? sender, EventArgs e)
         {
             this.Close();
+        }
+
+        private void MenuProfitCalculator_Click(object? sender, EventArgs e)
+        {
+            using var form = new ProfitCalculatorForm();
+            form.ShowDialog(this);
         }
 
         private void CreateToolStrip()
