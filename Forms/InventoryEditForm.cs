@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Linq; // Required for the .Cast<string>() extension
 using System.Windows.Forms;
 using InventoryPOS.Models;
@@ -20,7 +22,6 @@ namespace InventoryPOS.Forms
         private NumericUpDown numQuantity = null!;
         private ComboBox cmbSize = null!;
         private TextBox txtCustomSize = null!;
-        private TextBox txtCondition = null!;
         private TextBox txtBrand = null!;
         private TextBox txtColors = null!;
         private NumericUpDown numListingPrice = null!;
@@ -35,12 +36,26 @@ namespace InventoryPOS.Forms
         private DateTimePicker dtSoldDate = null!;
         private NumericUpDown numEarnings = null!;
 
+        // Fields for picture management tab
+        private UiState? _uiState;
+        private TabControl? pictureManagementTabControl;
+        private FlowLayoutPanel? _flowLayoutPanel;
+        private Panel? _picturePanel;
+        private Label? _lblDropZone;
+        private Button? _btnAddPicture;
+        private Button? _btnRemovePicture;
+        private Button? _btnClearAll;
+        private string? _selectedPicturePath;
+
         public InventoryItem ResultItem { get; private set; } = null!;
 
         public InventoryEditForm(InventoryItem? item = null)
         {
             _item = item ?? new InventoryItem();
             _isNew = item == null;
+
+            // Initialize with default UI state; will be loaded asynchronously after form shows
+            _uiState = new UiState();
 
             // 1. Initialize strictly standard designer properties
             InitializeComponent();
@@ -51,6 +66,43 @@ namespace InventoryPOS.Forms
 
             // 3. Populate data
             LoadItemData();
+
+            // 4. Load UI state asynchronously (non-blocking)
+            this.Load += async (_, _) => await LoadUiStateAsync();
+        }
+
+        private async Task LoadUiStateAsync()
+        {
+            try
+            {
+                var repository = new InventoryPOS.Services.InventoryRepository();
+                var loadedState = await repository.LoadUiStateAsync();
+                if (loadedState != null)
+                {
+                    _uiState = loadedState;
+                    // If we're on the Picture Management tab, refresh it with the loaded folder
+                    if (pictureManagementTabControl?.SelectedTab?.Text == "Picture Management")
+                    {
+                        RefreshPictureManagementTab();
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore state load errors; picture management will remain disabled
+            }
+        }
+
+        private void RefreshPictureManagementTab()
+        {
+            var tabPictures = pictureManagementTabControl?.TabPages.Cast<TabPage>().FirstOrDefault(t => t.Text == "Picture Management");
+            if (tabPictures == null) return;
+
+            // Clear existing controls
+            tabPictures.Controls.Clear();
+
+            // Re-setup with loaded UI state
+            SetupPictureManagementUI(tabPictures);
         }
 
         /// <summary>
@@ -79,10 +131,11 @@ namespace InventoryPOS.Forms
             this.SuspendLayout();
 
             // TabControl hosts both the inventory editor and the (future) picture management page
-            var tabControl = new TabControl
+            pictureManagementTabControl = new TabControl
             {
                 Dock = DockStyle.Fill
             };
+            pictureManagementTabControl.Name = "tabControl";
 
             // Tab 1 — Inventory Edit: keeps all the existing editor logic and controls.
             // mainPanel is the scrollable container the helpers and CreateControls() target.
@@ -99,9 +152,9 @@ namespace InventoryPOS.Forms
             // Tab 2 — Picture Management: placeholder, empty for now
             var tabPictures = new TabPage("Picture Management");
 
-            tabControl.TabPages.Add(tabInventory);
-            tabControl.TabPages.Add(tabPictures);
-            this.Controls.Add(tabControl);
+            pictureManagementTabControl.TabPages.Add(tabInventory);
+            pictureManagementTabControl.TabPages.Add(tabPictures);
+            this.Controls.Add(pictureManagementTabControl);
 
             CreateControls();
 
@@ -305,6 +358,15 @@ namespace InventoryPOS.Forms
 
             this.AcceptButton = btnSave;
             this.CancelButton = btnCancel;
+
+            this.ResumeLayout(true);
+
+            // Load picture management controls for tab 2
+            if (pictureManagementTabControl?.TabPages.Count > 1)
+            {
+                var tabPictures = pictureManagementTabControl.TabPages[1];
+                SetupPictureManagementUI(tabPictures);
+            }
         }
 
         private Label AddLabel(string text, int x, int y, int width)
@@ -448,6 +510,484 @@ namespace InventoryPOS.Forms
                 if (!_item.SoldDate.HasValue)
                 {
                     try { dtSoldDate.Value = DateTime.Today; } catch { }
+                }
+            }
+        }
+
+        private void SetupPictureManagementUI(TabPage tabPage)
+        {
+            // Check if picture folder is configured
+            if (string.IsNullOrWhiteSpace(_uiState?.PictureFolderPath))
+            {
+                // Display a message indicating that picture management is disabled
+                var lblDisabled = new Label
+                {
+                    Text = "Picture management is disabled. Please configure the picture folder in Application Configuration.",
+                    Location = new Point(20, 20),
+                    Size = new Size(360, 40),
+                    ForeColor = Color.Gray,
+                    AutoSize = true
+                };
+                tabPage.Controls.Add(lblDisabled);
+                return;
+            }
+
+            // Validate that the configured folder exists
+            if (!Directory.Exists(_uiState.PictureFolderPath))
+            {
+                var lblInvalidFolder = new Label
+                {
+                    Text = $"Configured picture folder does not exist: {_uiState.PictureFolderPath}",
+                    Location = new Point(20, 20),
+                    Size = new Size(360, 40),
+                    ForeColor = Color.Red,
+                    AutoSize = true
+                };
+                tabPage.Controls.Add(lblInvalidFolder);
+                return;
+            }
+
+            // Initialize picture management controls
+            var flowLayoutPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Padding = new Padding(10)
+            };
+            tabPage.Controls.Add(flowLayoutPanel);
+
+            // Create header section
+            var headerPanel = new Panel
+            {
+                Size = new Size(360, 80),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            var lblHeader = new Label
+            {
+                Text = $"Picture Management for SKU: {_item.SKU}",
+                Location = new Point(10, 10),
+                Size = new Size(340, 20),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            var lblFolderPath = new Label
+            {
+                Text = $"Folder: {_uiState.PictureFolderPath}",
+                Location = new Point(10, 35),
+                Size = new Size(340, 20),
+                ForeColor = Color.Gray,
+                Font = new Font("Segoe UI", 8F)
+            };
+            headerPanel.Controls.AddRange(new Control[] { lblHeader, lblFolderPath });
+            flowLayoutPanel.Controls.Add(headerPanel);
+
+            // Picture list header
+            var lblPictureListHeader = new Label
+            {
+                Text = "Pictures (max 20):",
+                Location = new Point(10, 90),
+                Size = new Size(340, 20),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            flowLayoutPanel.Controls.Add(lblPictureListHeader);
+
+            // Create a panel to hold individual picture controls
+            var picturePanel = new Panel
+            {
+                Size = new Size(340, 200),
+                BorderStyle = BorderStyle.FixedSingle,
+                AutoScroll = true
+            };
+            flowLayoutPanel.Controls.Add(picturePanel);
+
+            // Add drag and drop label
+            var lblDropZone = new Label
+            {
+                Text = "Drop images here to add to SKU folder",
+                Location = new Point(10, 210),
+                Size = new Size(340, 40),
+                BorderStyle = BorderStyle.Fixed3D,
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.FromArgb(240, 240, 240),
+                ForeColor = Color.DarkGray
+            };
+            // Enable drag and drop on the drop zone
+            lblDropZone.AllowDrop = true;
+            lblDropZone.DragEnter += PictureDragEnter;
+            lblDropZone.DragDrop += PictureDragDrop;
+            flowLayoutPanel.Controls.Add(lblDropZone);
+
+            // Add action buttons
+            var buttonPanel = new Panel
+            {
+                Size = new Size(360, 60),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            var btnAddPicture = new Button
+            {
+                Text = "Add Picture",
+                Location = new Point(20, 15),
+                Size = new Size(100, 30),
+                BackColor = Color.FromArgb(0, 122, 204),
+                ForeColor = Color.White
+            };
+            btnAddPicture.Click += BtnAddPicture_Click;
+            var btnRemovePicture = new Button
+            {
+                Text = "Remove Selected",
+                Location = new Point(130, 15),
+                Size = new Size(100, 30)
+            };
+            btnRemovePicture.Click += BtnRemovePicture_Click;
+            var btnClearAll = new Button
+            {
+                Text = "Clear All",
+                Location = new Point(240, 15),
+                Size = new Size(100, 30)
+            };
+            btnClearAll.Click += BtnClearAllPictures_Click;
+            buttonPanel.Controls.AddRange(new Control[] { btnAddPicture, btnRemovePicture, btnClearAll });
+            flowLayoutPanel.Controls.Add(buttonPanel);
+
+            // Store references for later use
+            _flowLayoutPanel = flowLayoutPanel;
+            _picturePanel = picturePanel;
+            _lblDropZone = lblDropZone;
+            _btnAddPicture = btnAddPicture;
+            _btnRemovePicture = btnRemovePicture;
+            _btnClearAll = btnClearAll;
+
+            // Load existing pictures
+            LoadPictures();
+        }
+
+        private async void LoadPictures()
+        {
+            if (_picturePanel == null) return;
+
+            _picturePanel.Controls.Clear();
+
+            // Get the SKU folder path
+            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
+            if (!Directory.Exists(skuFolder))
+            {
+                var lblNoPictures = new Label
+                {
+                    Text = "No pictures found for this SKU.",
+                    Location = new Point(10, 10),
+                    Size = new Size(320, 20),
+                    ForeColor = Color.Gray
+                };
+                _picturePanel.Controls.Add(lblNoPictures);
+                return;
+            }
+
+            var pictureFiles = Directory.GetFiles(skuFolder, "*.jpg")
+                .Concat(Directory.GetFiles(skuFolder, "*.jpeg"))
+                .Concat(Directory.GetFiles(skuFolder, "*.png"))
+                .Concat(Directory.GetFiles(skuFolder, "*.gif"))
+                .OrderBy(f => f)
+                .Take(20)
+                .ToList();
+
+            if (!pictureFiles.Any())
+            {
+                var lblNoPictures = new Label
+                {
+                    Text = "No pictures found for this SKU.",
+                    Location = new Point(10, 10),
+                    Size = new Size(320, 20),
+                    ForeColor = Color.Gray
+                };
+                _picturePanel.Controls.Add(lblNoPictures);
+                return;
+            }
+
+            // Display pictures as thumbnails
+            var y = 10;
+            foreach (var pictureFile in pictureFiles)
+            {
+                try
+                {
+                    // Create picture container
+                    var picContainer = new Panel
+                    {
+                        Size = new Size(140, 160),
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Margin = new Padding(5)
+                    };
+
+                    // Load thumbnail
+                    using var image = Image.FromFile(pictureFile);
+                    var thumbnail = GetThumbnail(image, 120, 120);
+
+                    var picBox = new PictureBox
+                    {
+                        Image = thumbnail,
+                        Size = new Size(120, 120),
+                        SizeMode = PictureBoxSizeMode.Zoom,
+                        Location = new Point(10, 10),
+                        BorderStyle = BorderStyle.FixedSingle
+                    };
+
+                    // Add filename label
+                    var fileName = new Label
+                    {
+                        Text = Path.GetFileName(pictureFile),
+                        Location = new Point(10, 135),
+                        Size = new Size(120, 15),
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        ForeColor = Color.Gray,
+                        Font = new Font("Segoe UI", 7F)
+                    };
+
+                    picContainer.Controls.AddRange(new Control[] { picBox, fileName });
+                    picContainer.Click += (s, e) => SelectPicture(picBox, pictureFile);
+                    picBox.Click += (s, e) => SelectPicture(picBox, pictureFile);
+
+                    picContainer.Top = y;
+                    _picturePanel.Controls.Add(picContainer);
+
+                    y += 165;
+                    if (y > 200) // Allow scrolling
+                    {
+                        _picturePanel.AutoScroll = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading image {pictureFile}: {ex.Message}");
+                }
+            }
+        }
+
+        private Image GetThumbnail(Image sourceImage, int width, int height)
+        {
+            var thumb = new Bitmap(width, height);
+            using (var graphics = Graphics.FromImage(thumb))
+            {
+                graphics.DrawImage(sourceImage, 0, 0, width, height);
+            }
+            return thumb;
+        }
+
+        private void SelectPicture(PictureBox pictureBox, string filePath)
+        {
+            // Clear previous selection
+            if (_picturePanel == null) return;
+            foreach (Control control in _picturePanel.Controls)
+            {
+                if (control is Panel panel)
+                {
+                    panel.BorderStyle = BorderStyle.FixedSingle;
+                    foreach (Control child in panel.Controls)
+                    {
+                        if (child is PictureBox picBox)
+                        {
+                            picBox.BorderStyle = BorderStyle.FixedSingle;
+                        }
+                    }
+                }
+            }
+
+            // Highlight selected picture
+            var selectedPanel = pictureBox.Parent as Panel;
+            if (selectedPanel != null)
+            {
+                selectedPanel.BorderStyle = BorderStyle.Fixed3D;
+                if (pictureBox.Parent is Panel parent)
+                {
+                    foreach (Control child in parent.Controls)
+                    {
+                        if (child is PictureBox picBox)
+                        {
+                            picBox.BorderStyle = BorderStyle.Fixed3D;
+                        }
+                    }
+                }
+            }
+
+            // Store selected picture path for actions
+            _selectedPicturePath = filePath;
+        }
+
+        private void PictureDragEnter(object? sender, DragEventArgs e)
+        {
+            if (e.Data is null) return;
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+
+            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            if (files == null || files.Length == 0) return;
+
+            bool hasImageFiles = files.Any(f => IsImageFile(f));
+            if (_lblDropZone != null)
+            {
+                if (hasImageFiles)
+                {
+                    _lblDropZone.BackColor = Color.FromArgb(200, 255, 200);
+                }
+                else
+                {
+                    _lblDropZone.BackColor = Color.FromArgb(255, 200, 200);
+                }
+            }
+        }
+
+        private void PictureDragDrop(object? sender, DragEventArgs e)
+        {
+            if (e.Data is null) return;
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+
+            var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+            if (files == null || files.Length == 0) return;
+
+            var imageFiles = files.Where(f => IsImageFile(f)).ToList();
+
+            if (imageFiles.Any())
+            {
+                _lblDropZone!.BackColor = Color.FromArgb(240, 240, 240);
+                AddPicturesToSKU(imageFiles);
+            }
+            else
+            {
+                MessageBox.Show("Please drop only image files (JPG, PNG, GIF).", "Invalid Files", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _lblDropZone!.BackColor = Color.FromArgb(255, 200, 200);
+            }
+        }
+
+        private bool IsImageFile(string filePath)
+        {
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif";
+        }
+
+        private void BtnAddPicture_Click(object? sender, EventArgs e)
+        {
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Select Images",
+                Filter = "Image Files (*.jpg;*.jpeg;*.png;*.gif)|*.jpg;*.jpeg;*.png;*.gif|All Files (*.*)|*.*",
+                Multiselect = true
+            };
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                AddPicturesToSKU(dialog.FileNames.ToList());
+            }
+        }
+
+        private async void AddPicturesToSKU(List<string> imageFiles)
+        {
+            if (imageFiles == null || imageFiles.Count == 0)
+                return;
+
+            // Check if we've reached the limit of 20 pictures
+            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
+            var existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
+
+            if (existingPictures + imageFiles.Count > 20)
+            {
+                MessageBox.Show("You cannot exceed 20 pictures for this item.", "Limit Reached", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                // Ensure the SKU folder exists
+                Directory.CreateDirectory(skuFolder);
+
+                // Copy images to SKU folder with unique names
+                var copiedFiles = new List<string>();
+                foreach (var sourceFile in imageFiles)
+                {
+                    var fileName = Path.GetFileName(sourceFile);
+                    var destinationFile = Path.Combine(skuFolder, fileName);
+
+                    // If file exists, add a number to make it unique
+                    if (File.Exists(destinationFile))
+                    {
+                        var counter = 1;
+                        var baseName = Path.GetFileNameWithoutExtension(fileName);
+                        var extension = Path.GetExtension(fileName);
+                        do
+                        {
+                            var newFileName = $"{baseName}_{counter}{extension}";
+                            destinationFile = Path.Combine(skuFolder, newFileName);
+                            counter++;
+                        } while (File.Exists(destinationFile));
+                    }
+
+                    File.Copy(sourceFile, destinationFile);
+                    copiedFiles.Add(destinationFile);
+                }
+
+                // Refresh the picture display
+                LoadPictures();
+
+                MessageBox.Show($"Successfully added {copiedFiles.Count} picture(s) to SKU {_item.SKU}.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to add pictures: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void BtnRemovePicture_Click(object? sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_selectedPicturePath))
+            {
+                MessageBox.Show("Please select a picture to remove.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var result = MessageBox.Show($"Are you sure you want to remove the picture '{Path.GetFileName(_selectedPicturePath)}'?", "Confirm Removal", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                try
+                {
+                    File.Delete(_selectedPicturePath);
+
+                    // Refresh the picture display
+                    LoadPictures();
+
+                    MessageBox.Show("Picture removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _selectedPicturePath = null;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to remove picture: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private async void BtnClearAllPictures_Click(object? sender, EventArgs e)
+        {
+            var result = MessageBox.Show("Are you sure you want to remove ALL pictures for this SKU? This cannot be undone.", "Confirm Clear All", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+
+            if (result == DialogResult.Yes)
+            {
+                try
+                {
+                    var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
+                    if (Directory.Exists(skuFolder))
+                    {
+                        foreach (var file in Directory.GetFiles(skuFolder))
+                        {
+                            File.Delete(file);
+                        }
+                        Directory.Delete(skuFolder);
+                    }
+
+                    // Refresh the picture display
+                    LoadPictures();
+
+                    MessageBox.Show("All pictures removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to remove pictures: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }
