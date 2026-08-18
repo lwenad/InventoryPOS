@@ -25,6 +25,7 @@ namespace InventoryPOS
         private ToolStripMenuItem menuFileSaveAs = null!;
         private ToolStripSeparator menuFileSep1 = null!;
         private ToolStripMenuItem menuFileExit = null!;
+        private ToolStripMenuItem menuConfiguration = null!;
         private ToolStripMenuItem menuProfitCalculator = null!;
         private ToolStrip toolStrip = null!;
         private ToolStripButton btnAdd = null!;
@@ -127,6 +128,13 @@ namespace InventoryPOS
             });
 
             menuStrip.Items.Add(menuFile);
+
+            menuConfiguration = new ToolStripMenuItem("&Configuration", null, MenuConfiguration_Click)
+            {
+                ShortcutKeys = Keys.Control | Keys.Oemcomma,
+                ToolTipText = "Open application configuration"
+            };
+            menuStrip.Items.Add(menuConfiguration);
 
             menuProfitCalculator = new ToolStripMenuItem("&Profit Calculator", null, MenuProfitCalculator_Click)
             {
@@ -266,6 +274,28 @@ namespace InventoryPOS
         {
             using var form = new ProfitCalculatorForm();
             form.ShowDialog(this);
+        }
+
+        private async void MenuConfiguration_Click(object? sender, EventArgs e)
+        {
+            var currentUiState = new UiState
+            {
+                SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                FilterColumn = _currentFilterColumn,
+                FilterValue = _currentFilterValue,
+                LastFilePath = _repository.CurrentFilePath,
+                PictureFolderPath = await _repository.LoadUiStateAsync() is { } ui ? ui.PictureFolderPath : null
+            };
+
+            using var form = new ApplicationConfigurationForm(currentUiState, OnConfigurationSaved);
+            form.ShowDialog(this);
+        }
+
+        private async void OnConfigurationSaved(UiState updatedState)
+        {
+            await _repository.SaveUiStateAsync(updatedState);
+            lblStatus.Text = "Configuration saved";
         }
 
         private void CreateToolStrip()

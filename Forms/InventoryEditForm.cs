@@ -78,13 +78,30 @@ namespace InventoryPOS.Forms
         {
             this.SuspendLayout();
 
+            // TabControl hosts both the inventory editor and the (future) picture management page
+            var tabControl = new TabControl
+            {
+                Dock = DockStyle.Fill
+            };
+
+            // Tab 1 — Inventory Edit: keeps all the existing editor logic and controls.
+            // mainPanel is the scrollable container the helpers and CreateControls() target.
+            var tabInventory = new TabPage("Inventory Edit");
+
             mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
                 Padding = new Padding(10)
             };
-            this.Controls.Add(mainPanel);
+            tabInventory.Controls.Add(mainPanel);
+
+            // Tab 2 — Picture Management: placeholder, empty for now
+            var tabPictures = new TabPage("Picture Management");
+
+            tabControl.TabPages.Add(tabInventory);
+            tabControl.TabPages.Add(tabPictures);
+            this.Controls.Add(tabControl);
 
             CreateControls();
 

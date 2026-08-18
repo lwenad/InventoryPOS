@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+.using System.Text.Json.Serialization;
 
 namespace InventoryPOS.Models
 {
@@ -9,5 +9,6 @@ namespace InventoryPOS.Models
         public string? FilterColumn { get; set; }
         public string? FilterValue { get; set; }
         public string? LastFilePath { get; set; }
+        public string? PictureFolderPath { get; set; }
     }
 }
