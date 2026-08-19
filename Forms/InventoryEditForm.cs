@@ -54,8 +54,10 @@ namespace InventoryPOS.Forms
             _item = item ?? new InventoryItem();
             _isNew = item == null;
 
-            // Initialize with default UI state; will be loaded asynchronously after form shows
-            _uiState = new UiState();
+            // Load UI state synchronously so the Picture Management tab is
+            // enabled correctly from the start (no race with async load)
+            _uiState = new InventoryPOS.Services.InventoryRepository().LoadUiState()
+                       ?? new UiState();
 
             // 1. Initialize strictly standard designer properties
             InitializeComponent();
@@ -66,30 +68,16 @@ namespace InventoryPOS.Forms
 
             // 3. Populate data
             LoadItemData();
-
-            // 4. Load UI state asynchronously (non-blocking)
-            this.Load += async (_, _) => await LoadUiStateAsync();
         }
 
-        private async Task LoadUiStateAsync()
+        private void PictureManagementTabControl_SelectedIndexChanged(object? sender, EventArgs e)
         {
-            try
+            // When the user navigates to the Picture Management tab, refresh its
+            // content so it reflects the current _uiState (e.g. folder was set after
+            // the form was opened, or pictures were added/removed)
+            if (pictureManagementTabControl?.SelectedTab?.Text == "Picture Management")
             {
-                var repository = new InventoryPOS.Services.InventoryRepository();
-                var loadedState = await repository.LoadUiStateAsync();
-                if (loadedState != null)
-                {
-                    _uiState = loadedState;
-                    // If we're on the Picture Management tab, refresh it with the loaded folder
-                    if (pictureManagementTabControl?.SelectedTab?.Text == "Picture Management")
-                    {
-                        RefreshPictureManagementTab();
-                    }
-                }
-            }
-            catch
-            {
-                // Ignore state load errors; picture management will remain disabled
+                RefreshPictureManagementTab();
             }
         }
 
@@ -155,6 +143,10 @@ namespace InventoryPOS.Forms
             pictureManagementTabControl.TabPages.Add(tabInventory);
             pictureManagementTabControl.TabPages.Add(tabPictures);
             this.Controls.Add(pictureManagementTabControl);
+
+            // Refresh the Picture Management tab when the user navigates to it,
+            // so it reflects the latest configuration (folder location) state
+            pictureManagementTabControl.SelectedIndexChanged += PictureManagementTabControl_SelectedIndexChanged;
 
             CreateControls();
 
@@ -669,7 +661,7 @@ namespace InventoryPOS.Forms
             _picturePanel.Controls.Clear();
 
             // Get the SKU folder path
-            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
+            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
             if (!Directory.Exists(skuFolder))
             {
                 var lblNoPictures = new Label
@@ -883,8 +875,12 @@ namespace InventoryPOS.Forms
                 return;
 
             // Check if we've reached the limit of 20 pictures
-            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
-            var existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
+            var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
+            int existingPictures = 0;
+            if (Directory.Exists(skuFolder))
+            {
+                existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
+            }
 
             if (existingPictures + imageFiles.Count > 20)
             {
@@ -970,7 +966,7 @@ namespace InventoryPOS.Forms
             {
                 try
                 {
-                    var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, _item.SKU);
+                    var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
                     if (Directory.Exists(skuFolder))
                     {
                         foreach (var file in Directory.GetFiles(skuFolder))
