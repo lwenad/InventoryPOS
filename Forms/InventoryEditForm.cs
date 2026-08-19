@@ -104,7 +104,7 @@ namespace InventoryPOS.Forms
             // Form settings
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(620, 660); // Increased width to fit two-panel layout
+            this.ClientSize = new Size(620, 850); // Increased height so Save/Cancel buttons are visible without scrolling
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;

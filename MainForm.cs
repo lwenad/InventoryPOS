@@ -50,6 +50,8 @@ namespace InventoryPOS
         private List<InventoryItem>? _lastDisplayBeforeSort;
         private List<InventoryItem>? _preFilterDisplay;
         private ToolStripStatusLabel lblFilterIndicator = null!;
+    private ToolStripStatusLabel lblSoldCount = null!;
+    private ToolStripStatusLabel lblCreatedCount = null!;
         private Dictionary<string, string> _originalHeaderTexts = new();
 
         public MainForm()
@@ -467,9 +469,9 @@ namespace InventoryPOS
                 CreateColumn("Quantity", "Qty", 25, true, DataGridViewContentAlignment.MiddleCenter),
                 CreateColumn("Size", "Size", 25, true),
                 CreateColumn("Colors", "Colors", 50, true),
-                CreateColumn("ListingPlatform", "Listing Platform", 100, true),
+                CreateColumn("ListingPlatform", "Listing Platform", 80, false),
                 // Show full date/time including seconds
-                CreateColumn("CreatedAt", "Created", 100, true, DataGridViewContentAlignment.MiddleCenter, "G")
+                CreateColumn("CreatedAt", "Created", 150, false, DataGridViewContentAlignment.MiddleCenter, "G")
             });
 
             dgvInventory.SelectionChanged += DgvInventory_SelectionChanged;
@@ -863,7 +865,21 @@ namespace InventoryPOS
                 ForeColor = Color.DarkBlue
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCount, lblTotalCOG, lblTotalEarnings, lblTotalProfit });
+            lblCreatedCount = new ToolStripStatusLabel("Created: 0")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
+            lblSoldCount = new ToolStripStatusLabel("Sold: 0")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCreatedCount, lblSoldCount, lblCount, lblTotalCOG, lblTotalEarnings, lblTotalProfit  });
             this.Controls.Add(statusStrip);
         }
 
@@ -997,6 +1013,10 @@ namespace InventoryPOS
         {
             var items = (_displayList != null && _displayList.Count > 0) ? _displayList : _allItems;
             lblCount.Text = $"{items.Count} item{(items.Count != 1 ? "s" : "")}";
+            int soldCount = items.Count(i => string.Equals(i.Status, "Sold", StringComparison.OrdinalIgnoreCase));
+            int createdCount = items.Count(i => string.Equals(i.Status, "Created", StringComparison.OrdinalIgnoreCase));
+            lblSoldCount.Text = $"Sold: {soldCount}";
+            lblCreatedCount.Text = $"Created: {createdCount}";
             decimal totalCOG = items.Sum(i => i.COG);
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
             decimal totalProfit = items.Sum(i => i.Profit);
@@ -1008,6 +1028,10 @@ namespace InventoryPOS
         private void UpdateCount(List<InventoryItem> items)
         {
             lblCount.Text = $"{items.Count} item{(items.Count != 1 ? "s" : "")}";
+            int soldCount = items.Count(i => string.Equals(i.Status, "Sold", StringComparison.OrdinalIgnoreCase));
+            int createdCount = items.Count(i => string.Equals(i.Status, "Created", StringComparison.OrdinalIgnoreCase));
+            lblSoldCount.Text = $"Sold: {soldCount}";
+            lblCreatedCount.Text = $"Created: {createdCount}";
             decimal totalCOG = items.Sum(i => i.COG);
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
             decimal totalProfit = items.Sum(i => i.Profit);
