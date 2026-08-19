@@ -551,12 +551,14 @@ namespace InventoryPOS.Forms
             return numeric;
         }
 
+        private static string TextOrDefault(string? value) => string.IsNullOrWhiteSpace(value) ? "na" : value;
+
         private void LoadItemData()
         {
-            txtTitle.Text = _item.Title;
-            txtDescription.Text = _item.Description;
-            txtCategory.Text = _item.Category;
-            txtSubCategory.Text = _item.SubCategory;
+            txtTitle.Text = TextOrDefault(_item.Title);
+            txtDescription.Text = TextOrDefault(_item.Description);
+            txtCategory.Text = TextOrDefault(_item.Category);
+            txtSubCategory.Text = TextOrDefault(_item.SubCategory);
             numQuantity.Value = Math.Min(Math.Max(_item.Quantity, numQuantity.Minimum), numQuantity.Maximum);
             // Load size: if it matches one of the combo items select it, otherwise select Custom and populate custom textbox
             if (!string.IsNullOrWhiteSpace(_item.Size) && cmbSize.Items.Contains(_item.Size))
@@ -575,10 +577,11 @@ namespace InventoryPOS.Forms
             }
             else
             {
-                cmbSize.SelectedIndex = -1;
-                txtCustomSize.Text = string.Empty;
-                txtCustomSize.Visible = false;
-                txtCustomSize.Enabled = false;
+                // Default to Custom with "na" when Size is empty
+                cmbSize.SelectedItem = "Custom";
+                txtCustomSize.Text = "na";
+                txtCustomSize.Visible = true;
+                txtCustomSize.Enabled = true;
             }
 
             // Set ComboBox selection for Condition
@@ -595,11 +598,11 @@ namespace InventoryPOS.Forms
             else
                 cmbStatus.SelectedIndex = 0; // default Created
 
-            txtBrand.Text = _item.Brand;
-            txtColors.Text = _item.Colors;
+            txtBrand.Text = TextOrDefault(_item.Brand);
+            txtColors.Text = TextOrDefault(_item.Colors);
             numListingPrice.Value = Math.Min(Math.Max(_item.ListingPrice, numListingPrice.Minimum), numListingPrice.Maximum);
             numCOG.Value = Math.Min(Math.Max(_item.COG, numCOG.Minimum), numCOG.Maximum);
-            txtSKU.Text = _item.SKU;
+            txtSKU.Text = TextOrDefault(_item.SKU);
 
             // Platform multi-select load logic
             if (!string.IsNullOrWhiteSpace(_item.ListingPlatform))
@@ -638,6 +641,27 @@ namespace InventoryPOS.Forms
                 dtSoldDate.Value = DateTime.Today;
             }
             dtSoldDate.Enabled = isSold;
+
+            // Color "na" default values red
+            var naTextBoxes = new[] { txtTitle, txtDescription, txtCategory, txtSubCategory, txtBrand, txtColors, txtSKU, txtCustomSize };
+            foreach (var tb in naTextBoxes)
+            {
+                SetNaForeColor(tb);
+                tb.TextChanged += NaTextBox_TextChanged;
+            }
+        }
+
+        private void NaTextBox_TextChanged(object? sender, EventArgs e)
+        {
+            if (sender is TextBox tb)
+                SetNaForeColor(tb);
+        }
+
+        private void SetNaForeColor(TextBox textBox)
+        {
+            textBox.ForeColor = string.Equals(textBox.Text.Trim(), "na", StringComparison.OrdinalIgnoreCase)
+                ? Color.Red
+                : SystemColors.WindowText;
         }
 
         private void CmbStatus_SelectedIndexChanged(object? sender, EventArgs e)
