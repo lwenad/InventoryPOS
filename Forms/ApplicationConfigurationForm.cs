@@ -145,7 +145,8 @@ namespace InventoryPOS.Forms
                 FilterColumn = _uiState.FilterColumn,
                 FilterValue = _uiState.FilterValue,
                 LastFilePath = _uiState.LastFilePath,
-                PictureFolderPath = txtPictureFolderPath.Text.Trim()
+                PictureFolderPath = txtPictureFolderPath.Text.Trim(),
+                HiddenColumns = _uiState.HiddenColumns
             };
 
             _onSave(updatedState);

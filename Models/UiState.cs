@@ -12,5 +12,6 @@ namespace InventoryPOS.Models
         public string? FilterValue { get; set; }
         public string? LastFilePath { get; set; }
         public string? PictureFolderPath { get; set; }
+        public List<string>? HiddenColumns { get; set; }
     }
 }

@@ -28,6 +28,9 @@ namespace InventoryPOS
         private ToolStripMenuItem menuFileExit = null!;
         private ToolStripMenuItem menuConfiguration = null!;
         private ToolStripMenuItem menuProfitCalculator = null!;
+        private ToolStripMenuItem menuView = null!;
+        private ToolStripMenuItem menuColumns = null!;
+        private HashSet<string> _hiddenColumns = new();
         private ToolStrip toolStrip = null!;
         private ToolStripButton btnAdd = null!;
         private ToolStripButton btnEdit = null!;
@@ -148,6 +151,14 @@ namespace InventoryPOS
             };
             menuStrip.Items.Add(menuProfitCalculator);
 
+            menuView = new ToolStripMenuItem("&View");
+            menuColumns = new ToolStripMenuItem("C&olumns")
+            {
+                DropDownDirection = ToolStripDropDownDirection.Right
+            };
+            menuView.DropDownItems.Add(menuColumns);
+            menuStrip.Items.Add(menuView);
+
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
         }
@@ -181,14 +192,7 @@ namespace InventoryPOS
                 lblStatus.Text = $"Loaded {_allItems.Count} items from {Path.GetFileName(filePath)}";
                 this.Text = $"InventoryPOS - {Path.GetFileName(filePath)}";
                 // persist last opened file path to UI state
-                var ui = new UiState
-                {
-                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath
-                };
+                var ui = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(ui);
                 _logger.LogInfo($"Successfully loaded {_allItems.Count} items from {filePath}");
             }
@@ -214,14 +218,7 @@ namespace InventoryPOS
                 await _repository.SaveAllAsync(_allItems);
                 lblStatus.Text = $"Saved to {Path.GetFileName(_repository.CurrentFilePath)}";
                 // persist last used file path in UI state
-                var uiSaved = new UiState
-                {
-                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath
-                };
+                var uiSaved = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(uiSaved);
                 _logger.LogInfo($"Successfully saved {_allItems.Count} items to {_repository.CurrentFilePath}");
             }
@@ -260,14 +257,7 @@ namespace InventoryPOS
                 lblStatus.Text = $"Saved to {Path.GetFileName(filePath)}";
                 this.Text = $"InventoryPOS - {Path.GetFileName(filePath)}";
                 // persist last used file path in UI state after Save As
-                var ui = new UiState
-                {
-                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath
-                };
+                var ui = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(ui);
                 _logger.LogInfo($"Successfully saved {_allItems.Count} items to {filePath} (Save As)");
             }
@@ -292,15 +282,8 @@ namespace InventoryPOS
 
         private async void MenuConfiguration_Click(object? sender, EventArgs e)
         {
-            var currentUiState = new UiState
-            {
-                SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                FilterColumn = _currentFilterColumn,
-                FilterValue = _currentFilterValue,
-                LastFilePath = _repository.CurrentFilePath,
-                PictureFolderPath = await _repository.LoadUiStateAsync() is { } ui ? ui.PictureFolderPath : null
-            };
+            var currentUiState = BuildCurrentState();
+            currentUiState.PictureFolderPath = await _repository.LoadUiStateAsync() is { } ui ? ui.PictureFolderPath : null;
 
             using var form = new ApplicationConfigurationForm(currentUiState, OnConfigurationSaved);
             form.ShowDialog(this);
@@ -509,6 +492,9 @@ namespace InventoryPOS
 
             // Initialize header styles to avoid header color change when cells are selected
             ResetHeaderStyles();
+
+            // Build the View → Columns submenu from the columns defined above
+            BuildColumnMenu();
         }
 
         private void DgvInventory_DataError(object? sender, DataGridViewDataErrorEventArgs e)
@@ -574,13 +560,7 @@ namespace InventoryPOS
                         UpdateFilterIndicator();
 
                         // persist UI state
-                        var ui = new UiState
-                        {
-                            SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                            SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                            FilterColumn = null,
-                            FilterValue = null
-                        };
+                        var ui = BuildCurrentState();
                         _ = _repository.SaveUiStateAsync(ui);
                     }));
                 };
@@ -664,14 +644,7 @@ namespace InventoryPOS
                 _logger.LogInfo($"Sorted by {propName} ({(asc ? "asc" : "desc")})");
 
                 // persist UI state
-                var ui = new UiState
-                {
-                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath
-                };
+                var ui = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(ui);
             }));
         }
@@ -698,14 +671,7 @@ namespace InventoryPOS
                 UpdateFilterIndicator();
 
                 // persist UI state
-                var ui = new UiState
-                {
-                    SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath
-                };
+                var ui = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(ui);
             }));
         }
@@ -927,6 +893,128 @@ namespace InventoryPOS
             return column;
         }
 
+        #region Column Visibility
+
+        /// <summary>
+        /// Populates the View → Columns submenu with one checkable item per
+        /// grid column. Each item's Checked state tracks column visibility.
+        /// </summary>
+        private void BuildColumnMenu()
+        {
+            menuColumns.DropDownItems.Clear();
+
+            foreach (DataGridViewColumn col in dgvInventory.Columns)
+            {
+                if (string.IsNullOrEmpty(col.DataPropertyName)) continue;
+
+                var item = new ToolStripMenuItem(col.HeaderText)
+                {
+                    CheckOnClick = true,
+                    Checked = true,
+                    Tag = col.DataPropertyName
+                };
+                item.CheckedChanged += ColumnMenuItem_CheckedChanged;
+                menuColumns.DropDownItems.Add(item);
+            }
+        }
+
+        /// <summary>
+        /// Toggles column visibility when a Columns menu item is checked/unchecked.
+        /// The last visible column cannot be hidden.
+        /// </summary>
+        private void ColumnMenuItem_CheckedChanged(object? sender, EventArgs e)
+        {
+            if (sender is not ToolStripMenuItem item) return;
+            var propName = item.Tag as string;
+            if (string.IsNullOrEmpty(propName)) return;
+
+            var col = dgvInventory.Columns
+                .Cast<DataGridViewColumn>()
+                .FirstOrDefault(c => string.Equals(c.DataPropertyName, propName, StringComparison.OrdinalIgnoreCase));
+            if (col == null) return;
+
+            if (!item.Checked) // user is about to hide this column
+            {
+                var visibleCount = dgvInventory.Columns
+                    .Cast<DataGridViewColumn>()
+                    .Count(c => !string.IsNullOrEmpty(c.DataPropertyName) && (c.Visible || string.Equals(c.DataPropertyName, propName, StringComparison.OrdinalIgnoreCase)));
+
+                if (visibleCount <= 1)
+                {
+                    // Don't allow hiding the last visible column
+                    item.Checked = true;
+                    return;
+                }
+            }
+
+            col.Visible = item.Checked;
+            UpdateHiddenColumns(propName, item.Checked);
+            SaveColumnVisibility();
+        }
+
+        private void UpdateHiddenColumns(string propName, bool visible)
+        {
+            if (visible)
+                _hiddenColumns.Remove(propName);
+            else
+                _hiddenColumns.Add(propName);
+        }
+
+        /// <summary>
+        /// Restores column visibility from a saved list of hidden DataPropertyNames.
+        /// Must be called after BuildColumnMenu so the menu checkboxes are synced too.
+        /// </summary>
+        private void ApplyColumnVisibility(List<string>? hiddenColumns)
+        {
+            _hiddenColumns = hiddenColumns != null
+                ? new HashSet<string>(hiddenColumns, StringComparer.OrdinalIgnoreCase)
+                : new HashSet<string>();
+
+            foreach (DataGridViewColumn col in dgvInventory.Columns)
+            {
+                if (string.IsNullOrEmpty(col.DataPropertyName)) continue;
+                col.Visible = !_hiddenColumns.Contains(col.DataPropertyName);
+            }
+
+            // Sync menu checkboxes without firing the CheckedChanged handler
+            foreach (ToolStripItem ti in menuColumns.DropDownItems)
+            {
+                if (ti is not ToolStripMenuItem mi || mi.Tag is not string pn) continue;
+                mi.CheckedChanged -= ColumnMenuItem_CheckedChanged;
+                var col = dgvInventory.Columns
+                    .Cast<DataGridViewColumn>()
+                    .FirstOrDefault(c => string.Equals(c.DataPropertyName, pn, StringComparison.OrdinalIgnoreCase));
+                mi.Checked = col?.Visible ?? true;
+                mi.CheckedChanged += ColumnMenuItem_CheckedChanged;
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Builds a UiState capturing the current sort, filter, file path,
+        /// and column-visibility settings. Used by every state-persistence call
+        /// so that no dimension of UI state is silently dropped when saving.
+        /// </summary>
+        private UiState BuildCurrentState()
+        {
+            return new UiState
+            {
+                SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
+                SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
+                FilterColumn = _currentFilterColumn,
+                FilterValue = _currentFilterValue,
+                LastFilePath = _repository.CurrentFilePath,
+                HiddenColumns = _hiddenColumns.Count > 0 ? _hiddenColumns.ToList() : null
+            };
+        }
+
+        private void SaveColumnVisibility()
+        {
+            var ui = BuildCurrentState();
+            _ = _repository.SaveUiStateAsync(ui);
+        }
+
         private void CreateStatusStrip()
         {
             statusStrip = new StatusStrip
@@ -1015,6 +1103,8 @@ namespace InventoryPOS
                 // Initialize display list and bind
                 _displayList = _allItems.ToList();
                 BindGrid(_displayList);
+                // Restore persisted column visibility (BuildColumnMenu already ran in InitializeComponent)
+                ApplyColumnVisibility(ui?.HiddenColumns);
                 lblStatus.Text = "Ready";
                 UpdateCount();
                 _logger.LogInfo($"LoadDataAsync completed: {_allItems.Count} items loaded");
@@ -1285,11 +1375,7 @@ namespace InventoryPOS
                 UpdateFilterIndicator();
 
                 // persist UI state
-                var uiClear = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = null,
-                    FilterValue = null,
-                    LastFilePath = _repository.CurrentFilePath };
+                var uiClear = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(uiClear);
                 return;
             }
@@ -1322,11 +1408,7 @@ namespace InventoryPOS
                 UpdateFilterIndicator();
 
                 // persist UI state
-                var ui = new UiState { SortColumn = _sortStates.Count == 1 ? _sortStates.Keys.First() : null,
-                    SortOrder = _sortStates.Count == 1 ? _sortStates.Values.First().ToString() : null,
-                    FilterColumn = _currentFilterColumn,
-                    FilterValue = _currentFilterValue,
-                    LastFilePath = _repository.CurrentFilePath };
+                var ui = BuildCurrentState();
                 _ = _repository.SaveUiStateAsync(ui);
             }));
         }
