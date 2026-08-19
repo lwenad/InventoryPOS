@@ -343,31 +343,42 @@ namespace InventoryPOS
             };
             btnRefresh.Click += BtnRefresh_Click;
 
-            var separator2 = new ToolStripSeparator();
-
-            var lblSearch = new ToolStripLabel("Search:");
-
             txtSearch = new ToolStripTextBox
             {
                 Name = "txtSearch",
                 Size = new Size(200, 25),
-                ToolTipText = "Search by title, SKU, brand, category..."
+                ToolTipText = "Search by title, SKU, brand, category...",
+                BackColor = Color.WhiteSmoke
             };
             txtSearch.KeyDown += TxtSearch_KeyDown;
 
+            // Solid, visible border on the hosted TextBox inside ToolStripTextBox
+            var host = txtSearch as ToolStripControlHost;
+            if (host?.Control is TextBox tb)
+            {
+                tb.BorderStyle = BorderStyle.FixedSingle;
+            }
+
             btnSearch = new ToolStripButton("Search")
             {
-                DisplayStyle = ToolStripItemDisplayStyle.Text
+                DisplayStyle = ToolStripItemDisplayStyle.Text,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
             btnSearch.Click += BtnSearch_Click;
+
+            // Center the search between left-aligned buttons and right edge
+            var springLeft = new ToolStripSeparator();
+            var springRight = new ToolStripSeparator();
+            springRight.Alignment = ToolStripItemAlignment.Right;
 
             toolStrip.Items.AddRange(new ToolStripItem[]
             {
                 btnAdd, btnEdit, btnDelete,
                 separator1,
                 btnRefresh,
-                separator2,
-                lblSearch, txtSearch, btnSearch
+                springLeft,
+                btnSearch, txtSearch,
+                springRight
             });
 
             this.Controls.Add(toolStrip);
@@ -1115,7 +1126,7 @@ namespace InventoryPOS
 
         private void PerformSearch()
         {
-            var searchText = txtSearch.Text?.Trim().ToLower();
+            var searchText = txtSearch.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrEmpty(searchText))
             {
                 // clear search filter
@@ -1136,16 +1147,16 @@ namespace InventoryPOS
             }
 
             var filtered = _allItems.Where(item =>
-                (item.Title?.ToLower().Contains(searchText) ?? false) ||
-                (item.SKU?.ToLower().Contains(searchText) ?? false) ||
-                (item.Brand?.ToLower().Contains(searchText) ?? false) ||
-                (item.Category?.ToLower().Contains(searchText) ?? false) ||
-                (item.SubCategory?.ToLower().Contains(searchText) ?? false) ||
-                (item.Description?.ToLower().Contains(searchText) ?? false) ||
-                (item.ListingPlatform?.ToLower().Contains(searchText) ?? false) ||
-                (item.Condition?.ToLower().Contains(searchText) ?? false) ||
-                (item.Size?.ToLower().Contains(searchText) ?? false) ||
-                (item.Colors?.ToLower().Contains(searchText) ?? false)
+                (item.Title?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.SKU?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Brand?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Category?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.SubCategory?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.ListingPlatform?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Condition?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Size?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (item.Colors?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
             ).ToList();
 
             // mark as search filter
