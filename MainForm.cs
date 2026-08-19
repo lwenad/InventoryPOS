@@ -513,12 +513,27 @@ namespace InventoryPOS
 
         private void DgvInventory_DataError(object? sender, DataGridViewDataErrorEventArgs e)
         {
-            // Suppress the default DataGridView error dialog and show a concise message.
+            // Suppress the default DataGridView error dialog so we control what the user sees.
             e.ThrowException = false;
-            _logger.LogWarning("Grid data error", e.Exception ?? new Exception("Unknown data error"));
+
+            var ex = e.Exception ?? new Exception("Unknown data error");
+            _logger.LogWarning(
+                $"Grid data error (row={e.RowIndex}, col={e.ColumnIndex})", ex);
+
+            // IndexOutOfRangeException from DataGridViewDataConnection.GetError(rowIndex)
+            // indicates a transient row-index sync issue (e.g. the grid tried to read a
+            // row that no longer exists after the data source was refreshed). These are
+            // self-healing — the grid recovers on the next paint — so we log them as a
+            // warning and update the status bar without alarming the user with a dialog.
+            if (ex is IndexOutOfRangeException)
+            {
+                lblStatus.Text = "Grid refreshed";
+                return;
+            }
+
             lblStatus.Text = "Grid data error";
             // Show the error briefly so user knows what happened and to aid debugging.
-            MessageBox.Show(this, $"A data error occurred in the grid: {e.Exception?.Message}", "Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(this, $"A data error occurred in the grid: {ex.Message}", "Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private void DgvInventory_CurrentCellChanged(object? sender, EventArgs e)
@@ -1091,7 +1106,17 @@ namespace InventoryPOS
                 _bindingList.RaiseListChangedEvents = true;
                 try
                 {
-                    _bindingSource?.ResetBindings(false);
+                    // Force=true is required here: because RaiseListChangedEvents was
+                    // disabled during the Clear()/Add() cycle, no ListChanged(Reset)
+                    // event was propagated to the grid, so its row count is still based
+                    // on the previous list. ResetBindings(true) calls
+                    // CurrencyManager.Refresh() which fires a full ListChanged(Reset),
+                    // causing the DataGridView to rebuild all rows and sync its row
+                    // count with the data source. Without this, a subsequent layout
+                    // pass can call GetError(rowIndex) for a row that no longer exists,
+                    // throwing IndexOutOfRangeException ("Index N does not have a value")
+                    // — most visible when filtering produces a smaller result set.
+                    _bindingSource?.ResetBindings(true);
                 }
                 catch
                 {
