@@ -516,7 +516,7 @@ namespace InventoryPOS.Forms
                 {
                     Text = "Picture management is disabled. Please configure the picture folder in Application Configuration.",
                     Location = new Point(20, 20),
-                    Size = new Size(360, 40),
+                    Size = new Size(340, 40),
                     ForeColor = Color.Gray,
                     AutoSize = true
                 };
@@ -531,7 +531,7 @@ namespace InventoryPOS.Forms
                 {
                     Text = $"Configured picture folder does not exist: {_uiState.PictureFolderPath}",
                     Location = new Point(20, 20),
-                    Size = new Size(360, 40),
+                    Size = new Size(340, 40),
                     ForeColor = Color.Red,
                     AutoSize = true
                 };
@@ -539,116 +539,169 @@ namespace InventoryPOS.Forms
                 return;
             }
 
-            // Initialize picture management controls
-            var flowLayoutPanel = new FlowLayoutPanel
+            // Main container with two areas: left = picture thumbnails, right = management controls
+            var mainContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                Padding = new Padding(8)
+            };
+            tabPage.Controls.Add(mainContainer);
+
+            // --- LEFT AREA: Picture thumbnails vertically aligned ---
+            var leftPanel = new Panel
+            {
+                Location = new Point(10, 10),
+                Size = new Size(340, 420),
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.White
+            };
+            mainContainer.Controls.Add(leftPanel);
+
+            // Header for picture area
+            var lblPicHeader = new Label
+            {
+                Text = "Pictures:",
+                Location = new Point(12, 8),
+                Size = new Size(100, 20),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(60, 60, 60)
+            };
+            leftPanel.Controls.Add(lblPicHeader);
+
+            // Flow layout for thumbnail pictures
+            var thumbFlow = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                Padding = new Padding(10)
+                Padding = new Padding(8)
             };
-            tabPage.Controls.Add(flowLayoutPanel);
+            leftPanel.Controls.Add(thumbFlow);
 
-            // Create header section
-            var headerPanel = new Panel
+            // --- RIGHT AREA: Management controls matching inventory tab style ---
+            var rightPanel = new Panel
             {
-                Size = new Size(360, 80),
-                BorderStyle = BorderStyle.FixedSingle
+                Location = new Point(360, 10),
+                Size = new Size(210, 420),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(245, 248, 252)
             };
-            var lblHeader = new Label
-            {
-                Text = $"Picture Management for SKU: {_item.SKU}",
-                Location = new Point(10, 10),
-                Size = new Size(340, 20),
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-            };
-            var lblFolderPath = new Label
+            mainContainer.Controls.Add(rightPanel);
+
+            // Folder path info label (matching inventory tab style)
+            var lblFolderInfo = new Label
             {
                 Text = $"Folder: {_uiState.PictureFolderPath}",
-                Location = new Point(10, 35),
-                Size = new Size(340, 20),
-                ForeColor = Color.Gray,
+                Location = new Point(15, 15),
+                Size = new Size(180, 20),
+                ForeColor = Color.FromArgb(120, 120, 120),
                 Font = new Font("Segoe UI", 8F)
             };
-            headerPanel.Controls.AddRange(new Control[] { lblHeader, lblFolderPath });
-            flowLayoutPanel.Controls.Add(headerPanel);
+            rightPanel.Controls.Add(lblFolderInfo);
 
-            // Picture list header
-            var lblPictureListHeader = new Label
+            // Picture count header
+            var lblPictureCount = new Label
             {
                 Text = "Pictures (max 20):",
-                Location = new Point(10, 90),
-                Size = new Size(340, 20),
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+                Location = new Point(15, 45),
+                Size = new Size(180, 20),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(60, 60, 60)
             };
-            flowLayoutPanel.Controls.Add(lblPictureListHeader);
+            rightPanel.Controls.Add(lblPictureCount);
 
-            // Create a panel to hold individual picture controls
-            var picturePanel = new Panel
+            // Drag & drop area
+            var dropZone = new Panel
             {
-                Size = new Size(340, 200),
-                BorderStyle = BorderStyle.FixedSingle,
-                AutoScroll = true
-            };
-            flowLayoutPanel.Controls.Add(picturePanel);
-
-            // Add drag and drop label
-            var lblDropZone = new Label
-            {
-                Text = "Drop images here to add to SKU folder",
-                Location = new Point(10, 210),
-                Size = new Size(340, 40),
-                BorderStyle = BorderStyle.Fixed3D,
-                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(180, 50),
+                Location = new Point(15, 75),
+                BorderStyle = BorderStyle.None,
                 BackColor = Color.FromArgb(240, 240, 240),
-                ForeColor = Color.DarkGray
+                Cursor = Cursors.Hand
             };
-            // Enable drag and drop on the drop zone
-            lblDropZone.AllowDrop = true;
-            lblDropZone.DragEnter += PictureDragEnter;
-            lblDropZone.DragDrop += PictureDragDrop;
-            flowLayoutPanel.Controls.Add(lblDropZone);
-
-            // Add action buttons
-            var buttonPanel = new Panel
+            dropZone.Paint += (s, e) =>
             {
-                Size = new Size(360, 60),
-                BorderStyle = BorderStyle.FixedSingle
+                using var pen = new Pen(Color.FromArgb(180, 180, 180), 1);
+                e.Graphics.DrawRectangle(pen, new Rectangle(0, 0, dropZone.Width - 1, dropZone.Height - 1));
             };
+            dropZone.MouseEnter += (s, e) =>
+            {
+                dropZone.BackColor = Color.FromArgb(230, 255, 230);
+                dropZone.Invalidate();
+            };
+            dropZone.MouseLeave += (s, e) =>
+            {
+                dropZone.BackColor = Color.FromArgb(240, 240, 240);
+                dropZone.Invalidate();
+            };
+
+            var lblDropZoneText = new Label
+            {
+                Text = "Drag & drop images here",
+                Location = new Point(10, 15),
+                Size = new Size(160, 20),
+                ForeColor = Color.FromArgb(100, 100, 100),
+                Font = new Font("Segoe UI", 8F),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            dropZone.Controls.Add(lblDropZoneText);
+
+            dropZone.AllowDrop = true;
+            dropZone.DragEnter += PictureDragEnter;
+            dropZone.DragDrop += PictureDragDrop;
+            rightPanel.Controls.Add(dropZone);
+
+            // Action buttons aligned to the right side of the panel
             var btnAddPicture = new Button
             {
                 Text = "Add Picture",
-                Location = new Point(20, 15),
+                Location = new Point(55, 140),
                 Size = new Size(100, 30),
                 BackColor = Color.FromArgb(0, 122, 204),
-                ForeColor = Color.White
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 9F),
             };
+            btnAddPicture.FlatStyle = FlatStyle.Flat;
+            btnAddPicture.FlatAppearance.BorderSize = 1;
+            btnAddPicture.FlatAppearance.BorderColor = Color.FromArgb(0, 122, 204);
+            btnAddPicture.MouseEnter += (s, e) => { btnAddPicture.BackColor = Color.FromArgb(230, 245, 255); btnAddPicture.ForeColor = Color.FromArgb(0, 122, 204); };
+            btnAddPicture.MouseLeave += (s, e) => { btnAddPicture.BackColor = Color.FromArgb(0, 122, 204); btnAddPicture.ForeColor = Color.White; };
             btnAddPicture.Click += BtnAddPicture_Click;
+            rightPanel.Controls.Add(btnAddPicture);
+
             var btnRemovePicture = new Button
             {
                 Text = "Remove Selected",
-                Location = new Point(130, 15),
-                Size = new Size(100, 30)
+                Location = new Point(55, 180),
+                Size = new Size(100, 30),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F)
             };
+            btnRemovePicture.FlatAppearance.BorderSize = 1;
+            btnRemovePicture.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btnRemovePicture.MouseEnter += (s, e) => { btnRemovePicture.BackColor = Color.FromArgb(240, 240, 240); };
+            btnRemovePicture.MouseLeave += (s, e) => { btnRemovePicture.BackColor = Color.White; };
             btnRemovePicture.Click += BtnRemovePicture_Click;
+            rightPanel.Controls.Add(btnRemovePicture);
+
             var btnClearAll = new Button
             {
                 Text = "Clear All",
-                Location = new Point(240, 15),
-                Size = new Size(100, 30)
+                Location = new Point(55, 220),
+                Size = new Size(100, 30),
+                ForeColor = Color.FromArgb(180, 50, 50),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F)
             };
+            btnClearAll.FlatAppearance.BorderSize = 1;
+            btnClearAll.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btnClearAll.MouseEnter += (s, e) => { btnClearAll.BackColor = Color.FromArgb(255, 230, 230); };
+            btnClearAll.MouseLeave += (s, e) => { btnClearAll.BackColor = Color.White; btnClearAll.ForeColor = Color.FromArgb(180, 50, 50); };
             btnClearAll.Click += BtnClearAllPictures_Click;
-            buttonPanel.Controls.AddRange(new Control[] { btnAddPicture, btnRemovePicture, btnClearAll });
-            flowLayoutPanel.Controls.Add(buttonPanel);
-
-            // Store references for later use
-            _flowLayoutPanel = flowLayoutPanel;
-            _picturePanel = picturePanel;
-            _lblDropZone = lblDropZone;
-            _btnAddPicture = btnAddPicture;
-            _btnRemovePicture = btnRemovePicture;
-            _btnClearAll = btnClearAll;
+            rightPanel.Controls.Add(btnClearAll);
+            _flowLayoutPanel = thumbFlow;
 
             // Load existing pictures
             LoadPictures();
@@ -656,9 +709,9 @@ namespace InventoryPOS.Forms
 
         private async void LoadPictures()
         {
-            if (_picturePanel == null) return;
+            if (_flowLayoutPanel == null) return;
 
-            _picturePanel.Controls.Clear();
+            _flowLayoutPanel.Controls.Clear();
 
             // Get the SKU folder path
             var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
@@ -671,7 +724,7 @@ namespace InventoryPOS.Forms
                     Size = new Size(320, 20),
                     ForeColor = Color.Gray
                 };
-                _picturePanel.Controls.Add(lblNoPictures);
+                _flowLayoutPanel.Controls.Add(lblNoPictures);
                 return;
             }
 
@@ -692,7 +745,7 @@ namespace InventoryPOS.Forms
                     Size = new Size(320, 20),
                     ForeColor = Color.Gray
                 };
-                _picturePanel.Controls.Add(lblNoPictures);
+                _flowLayoutPanel.Controls.Add(lblNoPictures);
                 return;
             }
 
@@ -739,12 +792,12 @@ namespace InventoryPOS.Forms
                     picBox.Click += (s, e) => SelectPicture(picBox, pictureFile);
 
                     picContainer.Top = y;
-                    _picturePanel.Controls.Add(picContainer);
+                    _flowLayoutPanel.Controls.Add(picContainer);
 
                     y += 165;
                     if (y > 200) // Allow scrolling
                     {
-                        _picturePanel.AutoScroll = true;
+                        _flowLayoutPanel.AutoScroll = true;
                     }
                 }
                 catch (Exception ex)
@@ -767,8 +820,8 @@ namespace InventoryPOS.Forms
         private void SelectPicture(PictureBox pictureBox, string filePath)
         {
             // Clear previous selection
-            if (_picturePanel == null) return;
-            foreach (Control control in _picturePanel.Controls)
+            if (_flowLayoutPanel == null) return;
+            foreach (Control control in _flowLayoutPanel.Controls)
             {
                 if (control is Panel panel)
                 {
