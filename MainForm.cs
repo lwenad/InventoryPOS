@@ -625,8 +625,8 @@ namespace InventoryPOS
 
             var asc = next == SortOrder.Ascending;
             var sorted = asc
-                ? source.OrderBy(i => GetPropertyValue(i, propName) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList()
-                : source.OrderByDescending(i => GetPropertyValue(i, propName) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList();
+                ? source.OrderBy(i => GetPropertyValue(i, propName), Comparer<object>.Create(ComparePropertyValues)).ToList()
+                : source.OrderByDescending(i => GetPropertyValue(i, propName), Comparer<object>.Create(ComparePropertyValues)).ToList();
 
             // Defer rebinding to avoid header click processing races
             this.BeginInvoke((Action)(() =>
@@ -742,6 +742,31 @@ namespace InventoryPOS
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Compares two property values for sorting. Nulls sort first (top) in
+        /// both ascending and descending order. DateTime values (CreatedAt is
+        /// DateTime; SoldDate is DateTime?, which boxes to DateTime or null) are
+        /// compared chronologically rather than as strings, which would sort
+        /// dates like "2024-..." lexically and break chronological order.
+        /// Everything else falls back to a case-insensitive string comparison.
+        /// </summary>
+        private static int ComparePropertyValues(object? a, object? b)
+        {
+            // Nulls sort first
+            if (a == null && b == null) return 0;
+            if (a == null) return -1;
+            if (b == null) return 1;
+
+            // Proper chronological DateTime comparison.
+            // (CreatedAt is DateTime; SoldDate is DateTime? whose non-null
+            // values arrive boxed as DateTime and whose nulls arrive as null.)
+            if (a is DateTime da && b is DateTime db)
+                return da.CompareTo(db);
+
+            // Fallback: case-insensitive string comparison for other types
+            return string.Compare(a.ToString(), b.ToString(), StringComparison.OrdinalIgnoreCase);
         }
 
         private void ResetHeaderStyles()
@@ -942,8 +967,8 @@ namespace InventoryPOS
                                 var source = (_displayList != null && _displayList.Count > 0) ? _displayList.ToList() : _allItems.ToList();
                                 var asc = ord == SortOrder.Ascending;
                                 var sorted = asc
-                                    ? source.OrderBy(i => GetPropertyValue(i, ui.SortColumn) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList()
-                                    : source.OrderByDescending(i => GetPropertyValue(i, ui.SortColumn) ?? string.Empty, Comparer<object>.Create((a,b)=> string.Compare(a?.ToString(), b?.ToString(), StringComparison.OrdinalIgnoreCase))).ToList();
+                                    ? source.OrderBy(i => GetPropertyValue(i, ui.SortColumn), Comparer<object>.Create(ComparePropertyValues)).ToList()
+                                    : source.OrderByDescending(i => GetPropertyValue(i, ui.SortColumn), Comparer<object>.Create(ComparePropertyValues)).ToList();
 
                                 BindGrid(sorted);
                                 UpdateCount(sorted);
