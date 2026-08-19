@@ -559,11 +559,9 @@ namespace InventoryPOS
                 menu.Items.Add(clearItem);
                 menu.Items.Add(new ToolStripSeparator());
 
-                var values = _allItems
-                    .Select(i => GetPropertyValue(i, propName)?.ToString() ?? string.Empty)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(v => v)
-                    .ToList();
+                // SKU is filtered by individual letters (case-insensitive) rather
+                // than by full SKU value, so users can narrow by the letters a SKU contains.
+                var values = GetDistinctFilterValues(propName);
 
                 foreach (var v in values.Take(100))
                 {
@@ -657,7 +655,7 @@ namespace InventoryPOS
             {
                 _preFilterDisplay = _displayList != null && _displayList.Count > 0 ? _displayList.ToList() : _allItems.ToList();
             }
-            var filtered = _allItems.Where(i => string.Equals(GetPropertyValue(i, propName)?.ToString() ?? string.Empty, value ?? string.Empty, StringComparison.OrdinalIgnoreCase)).ToList();
+            var filtered = _allItems.Where(i => MatchesFilter(i, propName, value)).ToList();
             // Update current display list and show filter indicator
             _currentFilterColumn = propName;
             _currentFilterValue = value;
@@ -767,6 +765,63 @@ namespace InventoryPOS
 
             // Fallback: case-insensitive string comparison for other types
             return string.Compare(a.ToString(), b.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Returns the distinct filter candidate values for a column, drawn from
+        /// the full inventory (consistent with the existing filter behavior).
+        /// Most columns return the distinct property values; the SKU column is a
+        /// special case and returns the distinct alphabetic characters (case-
+        /// insensitive) found across all SKU values, so users can narrow the
+        /// list by the letters a SKU contains.
+        /// </summary>
+        private List<string> GetDistinctFilterValues(string propName)
+        {
+            var rawValues = _allItems
+                .Select(i => GetPropertyValue(i, propName)?.ToString() ?? string.Empty)
+                .ToList();
+
+            if (string.Equals(propName, "SKU", StringComparison.OrdinalIgnoreCase))
+            {
+                // Normalize each letter to uppercase before dedup so that
+                // case variants (e.g. 'a' and 'A') collapse into one option.
+                // SKU filtering is case-insensitive (see MatchesFilter), so a
+                // single uppercase representative is shown per letter.
+                var seen = new HashSet<char>();
+                var letters = new List<char>();
+                foreach (var sv in rawValues)
+                {
+                    foreach (var c in sv)
+                    {
+                        if (!char.IsLetter(c)) continue;
+                        var upper = char.ToUpperInvariant(c);
+                        if (seen.Add(upper))
+                            letters.Add(upper);
+                    }
+                }
+                return letters.OrderBy(c => c).Select(c => c.ToString()).ToList();
+            }
+
+            // Default: distinct full values, case-insensitive
+            return rawValues.Distinct(StringComparer.OrdinalIgnoreCase)
+                            .OrderBy(v => v)
+                            .ToList();
+        }
+
+        /// <summary>
+        /// Determines whether an item matches a filter value for the given column.
+        /// Most columns use an exact (case-insensitive) match; the SKU column uses
+        /// a case-insensitive "contains" match against the selected letter.
+        /// </summary>
+        private bool MatchesFilter(InventoryItem item, string propName, string? value)
+        {
+            var itemValue = GetPropertyValue(item, propName)?.ToString() ?? string.Empty;
+            if (string.IsNullOrEmpty(value)) return string.IsNullOrEmpty(itemValue);
+
+            if (string.Equals(propName, "SKU", StringComparison.OrdinalIgnoreCase))
+                return itemValue.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
+
+            return string.Equals(itemValue, value, StringComparison.OrdinalIgnoreCase);
         }
 
         private void ResetHeaderStyles()
