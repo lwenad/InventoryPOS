@@ -40,6 +40,7 @@ namespace InventoryPOS.Forms
         private UiState? _uiState;
         private TabControl? pictureManagementTabControl;
         private FlowLayoutPanel? _flowLayoutPanel;
+        private Panel? _middlePanel;
         private Panel? _picturePanel;
         private Label? _lblDropZone;
         private Button? _btnAddPicture;
@@ -214,10 +215,22 @@ namespace InventoryPOS.Forms
             btnPanel.Controls.Add(btnClearAll);
             mainContainer.Controls.Add(btnPanel);
 
+            // Middle panel - shows "No pictures found" message when there are no pictures
+            _middlePanel = new Panel
+            {
+                Location = new Point(10, 50),
+                Size = new Size(580, 30),
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(245, 245, 245),
+                Visible = false
+            };
+            mainContainer.Controls.Add(_middlePanel);
+
             // --- BOTTOM: Picture thumbnails vertically aligned ---
+            // Moved down to accommodate the middle panel above it
             var bottomPanel = new Panel
             {
-                Location = new Point(10, 60),
+                Location = new Point(10, 80),
                 Size = new Size(580, 420),
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White
@@ -652,16 +665,25 @@ private async void LoadPictures()
 
             // Get the SKU folder path
             var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
-            if (!Directory.Exists(skuFolder))
+
+            // Hide middle panel initially (will show only when no pictures)
+            _middlePanel?.Visible = false;
+            _middlePanel?.Controls.Clear();
+
+            bool folderExists = Directory.Exists(skuFolder);
+
+            if (!folderExists)
             {
-                var lblNoPictures = new Label
+                // Show "No pictures found" in middle panel, don't display picture boxes
+                _middlePanel?.Visible = true;
+                _middlePanel?.Controls.Add(new Label
                 {
                     Text = "No pictures found for this SKU.",
-                    Location = new Point(10, 10),
+                    Location = new Point(20, 5),
                     Size = new Size(320, 20),
-                    ForeColor = Color.Gray
-                };
-                _flowLayoutPanel.Controls.Add(lblNoPictures);
+                    ForeColor = Color.Gray,
+                    AutoSize = true
+                });
                 return;
             }
 
@@ -675,14 +697,16 @@ private async void LoadPictures()
 
             if (!pictureFiles.Any())
             {
-                var lblNoPictures = new Label
+                // Show "No pictures found" in middle panel, don't display picture boxes
+                _middlePanel?.Visible = true;
+                _middlePanel?.Controls.Add(new Label
                 {
                     Text = "No pictures found for this SKU.",
-                    Location = new Point(10, 10),
+                    Location = new Point(20, 5),
                     Size = new Size(320, 20),
-                    ForeColor = Color.Gray
-                };
-                _flowLayoutPanel.Controls.Add(lblNoPictures);
+                    ForeColor = Color.Gray,
+                    AutoSize = true
+                });
                 return;
             }
 
