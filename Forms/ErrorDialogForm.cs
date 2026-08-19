@@ -2,11 +2,13 @@ using System;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
+using InventoryPOS.Services;
 
 namespace InventoryPOS.Forms
 {
     public class ErrorDialogForm : Form
     {
+        private readonly LoggerService _logger;
         private readonly Exception _exception;
         private readonly string _title;
         private RichTextBox txtDetails = null!;
@@ -15,8 +17,13 @@ namespace InventoryPOS.Forms
 
         public ErrorDialogForm(Exception ex, string title = "Error")
         {
+            _logger = LoggerService.Instance;
             _exception = ex ?? new Exception("Unknown error");
             _title = title ?? "Error";
+
+            // Log the exception details for troubleshooting
+            _logger.LogCritical($"Error dialog shown: {_title}", _exception);
+
             InitializeComponent();
             LoadException(_exception);
         }

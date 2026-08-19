@@ -2,11 +2,13 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 using InventoryPOS.Models;
+using InventoryPOS.Services;
 
 namespace InventoryPOS.Forms
 {
     public partial class ApplicationConfigurationForm : Form
     {
+        private readonly LoggerService _logger;
         private readonly UiState _uiState;
         private readonly Action<UiState> _onSave;
 
@@ -17,6 +19,8 @@ namespace InventoryPOS.Forms
 
         public ApplicationConfigurationForm(UiState currentState, Action<UiState> onSave)
         {
+            _logger = LoggerService.Instance;
+            _logger.LogInfo("ApplicationConfigurationForm opened");
             _uiState = currentState;
             _onSave = onSave;
             InitializeComponent();
@@ -145,6 +149,7 @@ namespace InventoryPOS.Forms
             };
 
             _onSave(updatedState);
+            _logger.LogInfo($"Configuration saved. PictureFolderPath: '{updatedState.PictureFolderPath}'");
             this.DialogResult = DialogResult.OK;
             this.Close();
         }

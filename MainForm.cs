@@ -15,6 +15,7 @@ namespace InventoryPOS
     public partial class MainForm : Form
     {
         private readonly InventoryRepository _repository;
+        private readonly LoggerService _logger;
         private DataGridView dgvInventory = null!;
         private BindingSource _bindingSource = null!;
         private BindingList<InventoryItem> _bindingList = null!;
@@ -57,6 +58,8 @@ namespace InventoryPOS
         public MainForm()
         {
             _repository = new InventoryRepository();
+            _logger = LoggerService.Instance;
+            _logger.LogInfo("MainForm initialized");
             InitializeComponent();
         }
 
@@ -169,6 +172,7 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo($"Load file requested: {filePath}");
                 lblStatus.Text = "Loading...";
                 _repository.SetFilePath(filePath);
                 _allItems = await _repository.GetAllAsync();
@@ -186,9 +190,11 @@ namespace InventoryPOS
                     LastFilePath = _repository.CurrentFilePath
                 };
                 _ = _repository.SaveUiStateAsync(ui);
+                _logger.LogInfo($"Successfully loaded {_allItems.Count} items from {filePath}");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to load file: {filePath}", ex);
                 lblStatus.Text = "Error loading file";
                 MessageBox.Show($"Failed to load inventory: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -203,6 +209,7 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo($"Save to current file requested: {_repository.CurrentFilePath}");
                 lblStatus.Text = "Saving...";
                 await _repository.SaveAllAsync(_allItems);
                 lblStatus.Text = $"Saved to {Path.GetFileName(_repository.CurrentFilePath)}";
@@ -216,9 +223,11 @@ namespace InventoryPOS
                     LastFilePath = _repository.CurrentFilePath
                 };
                 _ = _repository.SaveUiStateAsync(uiSaved);
+                _logger.LogInfo($"Successfully saved {_allItems.Count} items to {_repository.CurrentFilePath}");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to save to current file: {_repository.CurrentFilePath}", ex);
                 lblStatus.Text = "Error saving file";
                 MessageBox.Show($"Failed to save inventory: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -244,6 +253,7 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo($"Save As requested: {filePath}");
                 lblStatus.Text = "Saving...";
                 await _repository.SaveAllAsync(_allItems, filePath);
                 _repository.SetFilePath(filePath);
@@ -259,9 +269,11 @@ namespace InventoryPOS
                     LastFilePath = _repository.CurrentFilePath
                 };
                 _ = _repository.SaveUiStateAsync(ui);
+                _logger.LogInfo($"Successfully saved {_allItems.Count} items to {filePath} (Save As)");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to save As to file: {filePath}", ex);
                 lblStatus.Text = "Error saving file";
                 MessageBox.Show($"Failed to save inventory: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -503,6 +515,7 @@ namespace InventoryPOS
         {
             // Suppress the default DataGridView error dialog and show a concise message.
             e.ThrowException = false;
+            _logger.LogWarning("Grid data error", e.Exception ?? new Exception("Unknown data error"));
             lblStatus.Text = "Grid data error";
             // Show the error briefly so user knows what happened and to aid debugging.
             MessageBox.Show(this, $"A data error occurred in the grid: {e.Exception?.Message}", "Data Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -633,6 +646,7 @@ namespace InventoryPOS
                 UpdateCount(sorted);
                 UpdateSortGlyphs();
                 lblStatus.Text = $"Sorted by {propName} ({(asc ? "asc" : "desc")})";
+                _logger.LogInfo($"Sorted by {propName} ({(asc ? "asc" : "desc")})");
 
                 // persist UI state
                 var ui = new UiState
@@ -972,6 +986,7 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo("LoadDataAsync starting");
                 lblStatus.Text = "Loading...";
 
                 // Load UI state first so we can restore the last used data file path before loading data
@@ -987,6 +1002,7 @@ namespace InventoryPOS
                 BindGrid(_displayList);
                 lblStatus.Text = "Ready";
                 UpdateCount();
+                _logger.LogInfo($"LoadDataAsync completed: {_allItems.Count} items loaded");
 
                 // Load UI state (sort/filter) and apply asynchronously to avoid interfering with layout/event processing
                 if (ui != null)
@@ -1030,15 +1046,17 @@ namespace InventoryPOS
                                 UpdateSortGlyphs();
                             }
                         }
-                        catch
+                        catch (Exception ex)
                         {
                             // ignore UI apply failures
+                            _logger.LogWarning("Failed to restore saved UI state (sort/filter)", ex);
                         }
                     }));
                 }
             }
             catch (Exception ex)
             {
+                _logger.LogError("Failed to load data on startup", ex);
                 lblStatus.Text = "Error loading data";
                 MessageBox.Show($"Failed to load inventory: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1231,6 +1249,7 @@ namespace InventoryPOS
         private void PerformSearch()
         {
             var searchText = txtSearch.Text?.Trim() ?? string.Empty;
+            _logger.LogInfo($"Search initiated: '{searchText}'");
             if (string.IsNullOrEmpty(searchText))
             {
                 // clear search filter
@@ -1262,6 +1281,8 @@ namespace InventoryPOS
                 (item.Size?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 (item.Colors?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
             ).ToList();
+
+            _logger.LogInfo($"Search '{searchText}' returned {filtered.Count} of {_allItems.Count} items");
 
             // mark as search filter
             _currentFilterColumn = "Search";
@@ -1298,15 +1319,18 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo($"Adding new item. SKU: {item.SKU}, Title: {item.Title}");
                 lblStatus.Text = "Saving...";
                 await _repository.AddAsync(item);
                 _allItems.Insert(0, item);
                 BindGrid(_allItems);
                 UpdateCount();
                 lblStatus.Text = "Item added successfully";
+                _logger.LogInfo($"Item added successfully. SKU: {item.SKU}, Id: {item.Id}");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to add new item. SKU: {item.SKU}, Title: {item.Title}", ex);
                 lblStatus.Text = "Error saving item";
                 MessageBox.Show($"Failed to add item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1330,6 +1354,7 @@ namespace InventoryPOS
         {
             try
             {
+                _logger.LogInfo($"Updating item. SKU: {item.SKU}, Title: {item.Title}, Id: {item.Id}");
                 lblStatus.Text = "Saving...";
                 await _repository.UpdateAsync(item);
 
@@ -1342,9 +1367,11 @@ namespace InventoryPOS
                 BindGrid(_allItems);
                 UpdateCount();
                 lblStatus.Text = "Item updated successfully";
+                _logger.LogInfo($"Item updated successfully. SKU: {item.SKU}, Id: {item.Id}");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to update item. SKU: {item.SKU}, Title: {item.Title}", ex);
                 lblStatus.Text = "Error saving item";
                 MessageBox.Show($"Failed to update item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -1367,6 +1394,7 @@ namespace InventoryPOS
 
             try
             {
+                _logger.LogInfo($"Delete item requested. SKU: {selectedItem.SKU}, Title: {selectedItem.Title}, Id: {selectedItem.Id}");
                 lblStatus.Text = "Deleting...";
 
                 // Capture the selected row index so we can remove by index later on the UI thread.
@@ -1441,10 +1469,12 @@ namespace InventoryPOS
 
                         UpdateCount();
                         lblStatus.Text = "Item deleted";
+                        _logger.LogInfo($"Item deleted successfully. Id: {idToRemove}");
                     }
                     catch (Exception ex)
                     {
                         // If anything goes wrong updating the UI, show a non-fatal message and refresh the whole grid as a fallback
+                        _logger.LogError($"Failed to update UI after delete. Id: {idToRemove}", ex);
                         try
                         {
                             BindGrid(_allItems);
@@ -1461,6 +1491,7 @@ namespace InventoryPOS
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to delete item. Id: {selectedItem.Id}", ex);
                 lblStatus.Text = "Error deleting item";
                 MessageBox.Show($"Failed to delete item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

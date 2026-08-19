@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq; // Required for the .Cast<string>() extension
 using System.Windows.Forms;
 using InventoryPOS.Models;
+using InventoryPOS.Services;
 
 namespace InventoryPOS.Forms
 {
@@ -13,6 +14,7 @@ namespace InventoryPOS.Forms
     {
         private readonly InventoryItem _item;
         private readonly bool _isNew;
+        private readonly LoggerService _logger;
 
         private Panel mainPanel = null!;
         private TextBox txtTitle = null!;
@@ -54,6 +56,8 @@ namespace InventoryPOS.Forms
         {
             _item = item ?? new InventoryItem();
             _isNew = item == null;
+            _logger = LoggerService.Instance;
+            _logger.LogInfo($"InventoryEditForm opened. Mode: {(_isNew ? "New" : "Edit")}, SKU: {_item.SKU}");
 
             // Load UI state synchronously so the Picture Management tab is
             // enabled correctly from the start (no race with async load)
@@ -787,6 +791,7 @@ private async void LoadPictures()
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogWarning($"Error loading image {pictureFile}", ex);
                     System.Diagnostics.Debug.WriteLine($"Error loading image {pictureFile}: {ex.Message}");
                 }
             }
@@ -876,6 +881,7 @@ private async void LoadPictures()
 
             if (imageFiles.Any())
             {
+                _logger.LogInfo($"DragDrop: {imageFiles.Count} image(s) dropped for SKU {_item.SKU}");
                 _lblDropZone!.BackColor = Color.FromArgb(240, 240, 240);
                 AddPicturesToSKU(imageFiles);
             }
@@ -903,6 +909,7 @@ private async void LoadPictures()
 
             if (dialog.ShowDialog(this) == DialogResult.OK)
             {
+                _logger.LogInfo($"AddPicture dialog selected {dialog.FileNames.Length} image(s) for SKU {_item.SKU}");
                 AddPicturesToSKU(dialog.FileNames.ToList());
             }
         }
@@ -960,9 +967,11 @@ private async void LoadPictures()
                 LoadPictures();
 
                 MessageBox.Show($"Successfully added {copiedFiles.Count} picture(s) to SKU {_item.SKU}.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _logger.LogInfo($"Successfully added {copiedFiles.Count} picture(s) to SKU {_item.SKU}");
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Failed to add pictures for SKU {_item.SKU}", ex);
                 MessageBox.Show($"Failed to add pictures: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -987,10 +996,12 @@ private async void LoadPictures()
                     LoadPictures();
 
                     MessageBox.Show("Picture removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _logger.LogInfo($"Picture removed successfully. SKU: {_item.SKU}, File: {Path.GetFileName(_selectedPicturePath)}");
                     _selectedPicturePath = null;
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError($"Failed to remove picture for SKU {_item.SKU}", ex);
                     MessageBox.Show($"Failed to remove picture: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -1018,9 +1029,11 @@ private async void LoadPictures()
                     LoadPictures();
 
                     MessageBox.Show("All pictures removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    _logger.LogInfo($"All pictures cleared for SKU {_item.SKU}");
                 }
                 catch (Exception ex)
                 {
+                    _logger.LogError($"Failed to clear all pictures for SKU {_item.SKU}", ex);
                     MessageBox.Show($"Failed to remove pictures: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -1028,6 +1041,7 @@ private async void LoadPictures()
 
         private void BtnSave_Click(object? sender, EventArgs e)
         {
+            _logger.LogInfo($"Save clicked. SKU: {_item.SKU}, Mode: {(_isNew ? "New" : "Edit")}");
             if (string.IsNullOrWhiteSpace(txtTitle.Text))
             {
                 MessageBox.Show("Title is required.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -1123,6 +1137,7 @@ private async void LoadPictures()
             };
 
             this.DialogResult = DialogResult.OK;
+            _logger.LogInfo($"Item saved. SKU: {ResultItem.SKU}, Title: {ResultItem.Title}");
             this.Close();
         }
     }

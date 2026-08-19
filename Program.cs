@@ -1,5 +1,6 @@
 using System;
 using System.Windows.Forms;
+using InventoryPOS.Services;
 
 namespace InventoryPOS
 {
@@ -11,6 +12,10 @@ namespace InventoryPOS
         [STAThread]
         static void Main()
         {
+            var logger = LoggerService.Instance;
+            logger.LogInfo("=== InventoryPOS starting ===");
+            logger.LogInfo($"OS: {Environment.OSVersion} | CLR: {Environment.Version} | Working Set: {Environment.WorkingSet}");
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -18,33 +23,49 @@ namespace InventoryPOS
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
             Application.ThreadException += (sender, e) =>
             {
+                logger.LogError("Unhandled UI Exception", e.Exception);
                 try { ShowException(e.Exception, "Unhandled UI Exception"); }
-                catch { }
+                catch (Exception ex) { logger.LogError("Failed to show error dialog for UI exception", ex); }
             };
 
             // Catch non-UI thread exceptions
             AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
             {
-                try
-                {
-                    var ex = e.ExceptionObject as Exception ?? new Exception(e.ToString());
-                    ShowException(ex, "Unhandled Thread Exception");
-                }
-                catch { }
+                var ex = e.ExceptionObject as Exception ?? new Exception(e.ToString());
+                logger.LogCritical("Unhandled Thread Exception", ex);
+                try { ShowException(ex, "Unhandled Thread Exception"); }
+                catch (Exception showEx) { logger.LogError("Failed to show error dialog for thread exception", showEx); }
             };
 
             // Task scheduler exceptions
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (sender, e) =>
             {
+                logger.LogError("Unobserved Task Exception", e.Exception);
                 try
                 {
                     ShowException(e.Exception, "Unobserved Task Exception");
                     e.SetObserved();
                 }
-                catch { }
+                catch (Exception showEx)
+                {
+                    logger.LogError("Failed to show error dialog for task exception", showEx);
+                }
             };
 
-            Application.Run(new MainForm());
+            try
+            {
+                Application.Run(new MainForm());
+            }
+            catch (Exception ex)
+            {
+                logger.LogCritical("Fatal exception during Application.Run", ex);
+                ShowException(ex, "Fatal Application Error");
+            }
+            finally
+            {
+                logger.LogInfo("=== InventoryPOS shutting down ===");
+                logger.Flush();
+            }
         }
 
         internal static void ShowException(Exception ex, string title)

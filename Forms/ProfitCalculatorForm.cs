@@ -1,10 +1,12 @@
 using System;
 using System.Windows.Forms;
+using InventoryPOS.Services;
 
 namespace InventoryPOS.Forms
 {
     public class ProfitCalculatorForm : Form
     {
+        private readonly LoggerService _logger;
         private Label lblListingPrice = null!;
         private TextBox txtListingPrice = null!;
         private Label lblShippingPrice = null!;
@@ -19,6 +21,8 @@ namespace InventoryPOS.Forms
 
         public ProfitCalculatorForm()
         {
+            _logger = LoggerService.Instance;
+            _logger.LogInfo("ProfitCalculatorForm opened");
             InitializeComponent();
         }
 
@@ -232,6 +236,8 @@ namespace InventoryPOS.Forms
             var ebayProfit = CalculateEbayProfit(listingPrice, shippingPrice, cost);
             var poshmarkProfit = CalculatePoshmarkProfit(listingPrice, shippingPrice, cost);
             var depopProfit = CalculateDepopProfit(listingPrice, shippingPrice, cost);
+
+            _logger.LogInfo($"Profit calculated. Listing: ${listingPrice}, Shipping: ${shippingPrice}, Cost: ${cost} | eBay: ${ebayProfit}, Poshmark: ${poshmarkProfit}, Depop: ${depopProfit}");
 
             lblEbayResult.Text = $"eBay: {ebayProfit:C2}";
             lblEbayResult.ForeColor = ebayProfit >= 0 ? Color.Green : Color.Red;
