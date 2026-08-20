@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using InventoryPOS.Forms;
@@ -444,6 +445,12 @@ namespace InventoryPOS
                 RowTemplate = { Height = 72 },
                 GridColor = Color.FromArgb(224, 224, 224)
             };
+
+            // Enable double buffering to reduce flicker during data operations
+            typeof(DataGridView).InvokeMember(
+                "DoubleBuffered",
+                BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty,
+                null, dgvInventory, new object[] { true });
 
             dgvInventory.AutoGenerateColumns = false;
 
@@ -1748,7 +1755,7 @@ namespace InventoryPOS
                 RestoreFilteredOrSortedDisplay();
                 // Restore selection to the edited item and refresh the photo column
                 // (deferred to avoid races with the grid rebuilding rows).
-                this.BeginInvoke((MethodInvoker)(() =>
+                this.BeginInvoke((System.Windows.Forms.MethodInvoker)(() =>
                 {
                     RestoreGridSelection(selectedItem.Id);
                     RefreshPhotoColumn();
@@ -1788,7 +1795,7 @@ namespace InventoryPOS
                 // rebuilding rows caused by RestoreFilteredOrSortedDisplay calling
                 // BindGrid which clears the selection). Refresh first so the
                 // photo cells are ready, then restore selection.
-                this.BeginInvoke((MethodInvoker)(() =>
+                this.BeginInvoke((System.Windows.Forms.MethodInvoker)(() =>
                 {
                     RefreshPhotoColumn();
                     RestoreGridSelection(item.Id);
