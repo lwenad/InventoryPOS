@@ -48,11 +48,6 @@ namespace InventoryPOS.Forms
         private TabControl? pictureManagementTabControl;
         private FlowLayoutPanel? _flowLayoutPanel;
         private Panel? _middlePanel;
-        private Panel? _picturePanel;
-        private Label? _lblDropZone;
-        private Button? _btnAddPicture;
-        private Button? _btnRemovePicture;
-        private Button? _btnClearAll;
         private string? _selectedPicturePath;
 
         public InventoryItem ResultItem { get; private set; } = null!;
@@ -861,17 +856,7 @@ private async void LoadPictures()
             if (files == null || files.Length == 0) return;
 
             bool hasImageFiles = files.Any(f => IsImageFile(f));
-            if (_lblDropZone != null)
-            {
-                if (hasImageFiles)
-                {
-                    _lblDropZone.BackColor = Color.FromArgb(200, 255, 200);
-                }
-                else
-                {
-                    _lblDropZone.BackColor = Color.FromArgb(255, 200, 200);
-                }
-            }
+            e.Effect = hasImageFiles ? DragDropEffects.Copy : DragDropEffects.None;
         }
 
         private void PictureDragDrop(object? sender, DragEventArgs e)
@@ -887,13 +872,11 @@ private async void LoadPictures()
             if (imageFiles.Any())
             {
                 _logger.LogInfo($"DragDrop: {imageFiles.Count} image(s) dropped for SKU {_item.SKU}");
-                _lblDropZone!.BackColor = Color.FromArgb(240, 240, 240);
                 AddPicturesToSKU(imageFiles);
             }
             else
             {
                 MessageBox.Show("Please drop only image files (JPG, PNG, GIF).", "Invalid Files", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                _lblDropZone!.BackColor = Color.FromArgb(255, 200, 200);
             }
         }
 

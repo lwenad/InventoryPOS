@@ -76,21 +76,24 @@ namespace InventoryPOS
                 if (Application.OpenForms != null && Application.OpenForms.Count > 0)
                 {
                     var owner = Application.OpenForms[0];
-                    try
+                    if (owner != null)
                     {
-                        if (owner.InvokeRequired)
+                        try
                         {
-                            owner.BeginInvoke((Action)(() => new Forms.ErrorDialogForm(ex, title).ShowDialog(owner)));
+                            if (owner.InvokeRequired)
+                            {
+                                owner.BeginInvoke((Action)(() => new Forms.ErrorDialogForm(ex, title).ShowDialog(owner)));
+                            }
+                            else
+                            {
+                                new Forms.ErrorDialogForm(ex, title).ShowDialog(owner);
+                            }
+                            return;
                         }
-                        else
+                        catch
                         {
-                            new Forms.ErrorDialogForm(ex, title).ShowDialog(owner);
+                            // fall back to showing without owner
                         }
-                        return;
-                    }
-                    catch
-                    {
-                        // fall back to showing without owner
                     }
                 }
 

@@ -627,7 +627,7 @@ namespace InventoryPOS
                 _sortStates[propName] = next;
 
             // Determine current source list (display list if available)
-            var source = (_displayList != null && _displayList.Count > 0) ? _displayList.ToList() : _allItems.ToList();
+            var source = _displayList.Count > 0 ? _displayList.ToList() : _allItems.ToList();
 
             // If user is starting a new sort, save the current display ordering so we can restore it
             if (next != SortOrder.None)
@@ -656,8 +656,8 @@ namespace InventoryPOS
 
             var asc = next == SortOrder.Ascending;
             var sorted = asc
-                ? source.OrderBy(i => GetPropertyValue(i, propName), Comparer<object>.Create(ComparePropertyValues)).ToList()
-                : source.OrderByDescending(i => GetPropertyValue(i, propName), Comparer<object>.Create(ComparePropertyValues)).ToList();
+                ? source.OrderBy(i => GetPropertyValue(i, propName), Comparer<object?>.Create(ComparePropertyValues)).ToList()
+                : source.OrderByDescending(i => GetPropertyValue(i, propName), Comparer<object?>.Create(ComparePropertyValues)).ToList();
 
             // Defer rebinding to avoid header click processing races
             this.BeginInvoke((Action)(() =>
@@ -680,7 +680,7 @@ namespace InventoryPOS
             // Capture current display before applying a filter so Clear Filter can restore it
             if (_preFilterDisplay == null || _preFilterDisplay.Count == 0)
             {
-                _preFilterDisplay = _displayList != null && _displayList.Count > 0 ? _displayList.ToList() : _allItems.ToList();
+                _preFilterDisplay = _displayList.Count > 0 ? _displayList.ToList() : _allItems.ToList();
             }
             var filtered = _allItems.Where(i => MatchesFilter(i, propName, value)).ToList();
             // Update current display list and show filter indicator
@@ -1199,8 +1199,8 @@ namespace InventoryPOS
                                 var source = (_displayList != null && _displayList.Count > 0) ? _displayList.ToList() : _allItems.ToList();
                                 var asc = ord == SortOrder.Ascending;
                                 var sorted = asc
-                                    ? source.OrderBy(i => GetPropertyValue(i, ui.SortColumn), Comparer<object>.Create(ComparePropertyValues)).ToList()
-                                    : source.OrderByDescending(i => GetPropertyValue(i, ui.SortColumn), Comparer<object>.Create(ComparePropertyValues)).ToList();
+                                    ? source.OrderBy(i => GetPropertyValue(i, ui.SortColumn), Comparer<object?>.Create(ComparePropertyValues)).ToList()
+                                    : source.OrderByDescending(i => GetPropertyValue(i, ui.SortColumn), Comparer<object?>.Create(ComparePropertyValues)).ToList();
 
                                 BindGrid(sorted);
                                 UpdateCount(sorted);
@@ -1400,8 +1400,8 @@ namespace InventoryPOS
                 var kv = _sortStates.First();
                 var asc = kv.Value == SortOrder.Ascending;
                 var sorted = asc
-                    ? _allItems.OrderBy(i => GetPropertyValue(i, kv.Key), Comparer<object>.Create(ComparePropertyValues)).ToList()
-                    : _allItems.OrderByDescending(i => GetPropertyValue(i, kv.Key), Comparer<object>.Create(ComparePropertyValues)).ToList();
+                    ? _allItems.OrderBy(i => GetPropertyValue(i, kv.Key), Comparer<object?>.Create(ComparePropertyValues)).ToList()
+                    : _allItems.OrderByDescending(i => GetPropertyValue(i, kv.Key), Comparer<object?>.Create(ComparePropertyValues)).ToList();
                 _displayList = sorted;
                 BindGrid(_displayList);
                 UpdateCount(_displayList);
