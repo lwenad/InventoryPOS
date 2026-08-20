@@ -921,12 +921,14 @@ namespace InventoryPOS
         /// <summary>
         /// Creates a <see cref="DataGridViewImageColumn"/> for thumbnail display
         /// (used by the Photo column). The image is centered and zoomed to fit the cell.
+        /// The column is unbound (no DataPropertyName) because the image value is set
+        /// dynamically in <see cref="DgvInventory_CellFormatting"/>.
         /// </summary>
-        private DataGridViewImageColumn CreateImageColumn(string dataPropertyName, string headerText, int width)
+        private DataGridViewImageColumn CreateImageColumn(string name, string headerText, int width)
         {
             var column = new DataGridViewImageColumn
             {
-                DataPropertyName = dataPropertyName,
+                Name = name,
                 HeaderText = headerText,
                 Width = width,
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
@@ -935,7 +937,9 @@ namespace InventoryPOS
                     Alignment = DataGridViewContentAlignment.MiddleCenter
                 },
                 ImageLayout = DataGridViewImageCellLayout.Zoom,
-                MinimumWidth = 70
+                MinimumWidth = 70,
+                // Ensure the cell template is an image cell (not text)
+                CellTemplate = new DataGridViewImageCell()
             };
             return column;
         }
@@ -1272,6 +1276,10 @@ namespace InventoryPOS
             try { dgvInventory.CurrentCell = null; } catch { }
             dgvInventory.ClearSelection();
             UpdateSortGlyphs();
+
+            // Force a repaint so CellFormatting runs and image cells are rendered
+            dgvInventory.Invalidate();
+            dgvInventory.Refresh();
         }
 
         private void UpdateCount()
@@ -1367,7 +1375,8 @@ namespace InventoryPOS
                 var col = dgvInventory.Columns[e.ColumnIndex];
 
                 // Photo column: resolve the thumbnail from the SKU folder
-                if (string.Equals(col.DataPropertyName, "Photo", StringComparison.OrdinalIgnoreCase))
+                // Use Name (not DataPropertyName) because the column is unbound
+                if (string.Equals(col.Name, "Photo", StringComparison.OrdinalIgnoreCase))
                 {
                     if (e.RowIndex < _bindingList.Count)
                     {
@@ -1379,21 +1388,35 @@ namespace InventoryPOS
                             if (string.IsNullOrEmpty(_pictureFolderPath))
                             {
                                 cachedImage = PictureService.GetPlaceholderImage();
+                                _logger.LogInfo($"Photo column: PictureFolderPath is null/empty, showing placeholder for SKU '{sku}'");
                             }
                             else
                             {
                                 var picPath = PictureService.GetFirstPicturePath(_pictureFolderPath, sku);
-                                cachedImage = string.IsNullOrEmpty(picPath)
-                                    ? PictureService.GetPlaceholderImage()
-                                    : PictureService.LoadThumbnail(picPath);
-                                // Cache the result (including null failures by caching placeholder)
-                                if (cachedImage == null)
+                                if (string.IsNullOrEmpty(picPath))
+                                {
                                     cachedImage = PictureService.GetPlaceholderImage();
+                                    _logger.LogInfo($"Photo column: No image found for SKU '{sku}' in '{_pictureFolderPath}', showing placeholder");
+                                }
+                                else
+                                {
+                                    cachedImage = PictureService.LoadThumbnail(picPath);
+                                    if (cachedImage == null)
+                                    {
+                                        cachedImage = PictureService.GetPlaceholderImage();
+                                        _logger.LogInfo($"Photo column: Failed to load thumbnail for SKU '{sku}' from '{picPath}', showing placeholder");
+                                    }
+                                    else
+                                    {
+                                        _logger.LogInfo($"Photo column: Loaded thumbnail for SKU '{sku}' from '{picPath}'");
+                                    }
+                                }
                             }
                             _photoCache[sku] = cachedImage;
                         }
 
                         e.Value = cachedImage;
+                        e.FormattingApplied = true;
                     }
                     return;
                 }
@@ -1591,6 +1614,9 @@ namespace InventoryPOS
             using var form = new InventoryEditForm(selectedItem);
             if (form.ShowDialog(this) == DialogResult.OK)
             {
+                // Clear the photo cache — pictures may have been added or removed
+                // via the Picture Management tab in the edit form.
+                _photoCache.Clear();
                 _ = SaveEditedItemAsync(form.ResultItem);
             }
         }
