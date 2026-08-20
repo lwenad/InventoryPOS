@@ -16,6 +16,7 @@ namespace InventoryPOS.Forms
         private Button btnBrowse = null!;
         private TextBox txtLogFolderPath = null!;
         private Button btnBrowseLog = null!;
+        private CheckedListBox chkDefaultPlatforms = null!;
         private Button btnSave = null!;
         private Button btnCancel = null!;
 
@@ -123,13 +124,14 @@ namespace InventoryPOS.Forms
             this.Controls.Add(lblDefaultPlatform);
 
             // Default Listing Platforms CheckedListBox
-            var chkDefaultPlatforms = new CheckedListBox
+            chkDefaultPlatforms = new CheckedListBox
             {
                 Location = new Point(190, 108),
                 Size = new Size(150, 75),
                 Items = { "eBay", "Poshmark", "Depop" }
             };
 
+            // Pre-select platforms that are in the saved default
             if (!string.IsNullOrWhiteSpace(_uiState.DefaultListingPlatforms))
             {
                 var savedPlatforms = _uiState.DefaultListingPlatforms
@@ -143,19 +145,6 @@ namespace InventoryPOS.Forms
                     }
                 }
             }
-
-            chkDefaultPlatforms.ItemCheck += (s, e) =>
-            {
-                var selected = new List<string>();
-                for (int i = 0; i < chkDefaultPlatforms.Items.Count; i++)
-                {
-                    if (chkDefaultPlatforms.GetItemChecked(i))
-                    {
-                        selected.Add(chkDefaultPlatforms.Items[i].ToString()!);
-                    }
-                }
-                _uiState.DefaultListingPlatforms = string.Join(", ", selected);
-            };
             this.Controls.Add(chkDefaultPlatforms);
 
             // Max Images per SKU Label
@@ -272,6 +261,16 @@ namespace InventoryPOS.Forms
 
         private void BtnSave_Click(object? sender, EventArgs e)
         {
+            // Gather the currently checked platforms from the CheckedListBox
+            var selected = new List<string>();
+            for (int i = 0; i < chkDefaultPlatforms.Items.Count; i++)
+            {
+                if (chkDefaultPlatforms.GetItemChecked(i))
+                {
+                    selected.Add(chkDefaultPlatforms.Items[i].ToString()!);
+                }
+            }
+
             var updatedState = new UiState
             {
                 SortColumn = _uiState.SortColumn,
@@ -281,7 +280,7 @@ namespace InventoryPOS.Forms
                 LastFilePath = _uiState.LastFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
                 LogFolderPath = txtLogFolderPath.Text.Trim(),
-                DefaultListingPlatforms = _uiState.DefaultListingPlatforms,
+                DefaultListingPlatforms = string.Join(", ", selected),
                 MaxImagesPerSku = _uiState.MaxImagesPerSku,
                 ConfirmBeforeDelete = _uiState.ConfirmBeforeDelete,
                 HiddenColumns = _uiState.HiddenColumns
