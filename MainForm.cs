@@ -544,8 +544,6 @@ namespace InventoryPOS
             e.ThrowException = false;
 
             var ex = e.Exception ?? new Exception("Unknown data error");
-            _logger.LogWarning(
-                $"Grid data error (row={e.RowIndex}, col={e.ColumnIndex})", ex);
 
             // IndexOutOfRangeException from DataGridViewDataConnection.GetError(rowIndex)
             // indicates a transient row-index sync issue (e.g. the grid tried to read a
@@ -557,6 +555,18 @@ namespace InventoryPOS
                 lblStatus.Text = "Grid refreshed";
                 return;
             }
+
+            // FormatException can occur during cell formatting (e.g. Photo column image
+            // cell type mismatch during filter/search transitions). These are also
+            // typically transient and self-healing on the next paint cycle.
+            if (ex is FormatException)
+            {
+                _logger.LogDebug($"Grid format error (row={e.RowIndex}, col={e.ColumnIndex}): {ex.Message}");
+                return;
+            }
+
+            _logger.LogWarning(
+                $"Grid data error (row={e.RowIndex}, col={e.ColumnIndex})", ex);
 
             lblStatus.Text = "Grid data error";
             // Show the error briefly so user knows what happened and to aid debugging.
