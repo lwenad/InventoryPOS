@@ -1283,6 +1283,29 @@ namespace InventoryPOS
         }
 
         /// <summary>
+        /// Restores the grid selection to the row whose <see cref="InventoryItem.Id"/>
+        /// matches <paramref name="itemId"/>. Called after a rebind so the user's
+        /// place in the grid is preserved after operations such as editing an item.
+        /// </summary>
+        private void RestoreGridSelection(string? itemId)
+        {
+            if (string.IsNullOrEmpty(itemId)) return;
+
+            for (int i = 0; i < dgvInventory.Rows.Count; i++)
+            {
+                if (dgvInventory.Rows[i].IsNewRow) continue;
+                var rowItem = dgvInventory.Rows[i].DataBoundItem as InventoryItem;
+                if (rowItem?.Id == itemId)
+                {
+                    dgvInventory.ClearSelection();
+                    dgvInventory.Rows[i].Selected = true;
+                    dgvInventory.CurrentCell = dgvInventory.Rows[i].Cells[0];
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
         /// Forces re-population of the Photo column cells after the thumbnail
         /// cache has been invalidated (e.g. after adding or removing pictures
         /// via the edit form). Directly sets cell values so the grid reflects
@@ -1685,8 +1708,13 @@ namespace InventoryPOS
                 // an application restart.
                 _photoCache.Clear();
                 RestoreFilteredOrSortedDisplay();
-                // Force the photo column to refresh on the UI thread.
-                this.BeginInvoke((MethodInvoker)(() => RefreshPhotoColumn()));
+                // Restore selection to the edited item and refresh the photo column
+                // (deferred to avoid races with the grid rebuilding rows).
+                this.BeginInvoke((MethodInvoker)(() =>
+                {
+                    RestoreGridSelection(selectedItem.Id);
+                    RefreshPhotoColumn();
+                }));
             }
         }
 
@@ -1711,10 +1739,12 @@ namespace InventoryPOS
                 // filter is not cleared after editing an item.
                 RestoreFilteredOrSortedDisplay();
 
-                // Force the photo column cells to re-resolve from disk
-                // (deferred to avoid races with the grid rebuilding rows)
+                // Force the photo column cells to re-resolve from disk and
+                // restore the grid selection to the edited item (deferred to
+                // avoid races with the grid rebuilding rows).
                 this.BeginInvoke((MethodInvoker)(() =>
                 {
+                    RestoreGridSelection(item.Id);
                     RefreshPhotoColumn();
                 }));
 
