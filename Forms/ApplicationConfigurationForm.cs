@@ -132,6 +132,7 @@ namespace InventoryPOS.Forms
             };
 
             // Pre-select platforms that are in the saved default
+            _logger.LogInfo($"Config form loading DefaultListingPlatforms: '{_uiState.DefaultListingPlatforms}'");
             if (!string.IsNullOrWhiteSpace(_uiState.DefaultListingPlatforms))
             {
                 var savedPlatforms = _uiState.DefaultListingPlatforms
@@ -142,6 +143,7 @@ namespace InventoryPOS.Forms
                     if (index >= 0)
                     {
                         chkDefaultPlatforms.SetItemChecked(index, true);
+                        _logger.LogInfo($"Config form pre-checked: {platform}");
                     }
                 }
             }
@@ -270,6 +272,8 @@ namespace InventoryPOS.Forms
                     selected.Add(chkDefaultPlatforms.Items[i].ToString()!);
                 }
             }
+            var platformsToSave = string.Join(", ", selected);
+            _logger.LogInfo($"Config form saving DefaultListingPlatforms: '{platformsToSave}'");
 
             var updatedState = new UiState
             {
@@ -280,7 +284,7 @@ namespace InventoryPOS.Forms
                 LastFilePath = _uiState.LastFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
                 LogFolderPath = txtLogFolderPath.Text.Trim(),
-                DefaultListingPlatforms = string.Join(", ", selected),
+                DefaultListingPlatforms = platformsToSave,
                 MaxImagesPerSku = _uiState.MaxImagesPerSku,
                 ConfirmBeforeDelete = _uiState.ConfirmBeforeDelete,
                 HiddenColumns = _uiState.HiddenColumns

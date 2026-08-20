@@ -307,6 +307,7 @@ namespace InventoryPOS
             // Load saved UI state first so preserved values (like DefaultListingPlatforms)
             // are available before we build the current state on top of them.
             var savedUiState = await _repository.LoadUiStateAsync();
+            _logger.LogInfo($"MainForm MenuConfiguration_Click loaded DefaultListingPlatforms: '{savedUiState?.DefaultListingPlatforms}'");
 
             var currentUiState = BuildCurrentState();
             // Restore saved values that BuildCurrentState would otherwise reset
@@ -318,6 +319,7 @@ namespace InventoryPOS
                 currentUiState.LogFolderPath = savedUiState.LogFolderPath;
                 currentUiState.PictureFolderPath = savedUiState.PictureFolderPath;
             }
+            _logger.LogInfo($"MainForm passing to config form DefaultListingPlatforms: '{currentUiState.DefaultListingPlatforms}'");
 
             using var form = new ApplicationConfigurationForm(currentUiState, OnConfigurationSaved);
             form.ShowDialog(this);
