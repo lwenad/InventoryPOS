@@ -6,6 +6,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyTitle>InventoryPOS</AssemblyTitle>
+    <AssemblyDescription>Clothing inventory management for resale</AssemblyDescription>
+    <AssemblyProduct>InventoryPOS</AssemblyProduct>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
       </PropertyGroup>
 
 </Project>

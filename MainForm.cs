@@ -77,7 +77,7 @@ namespace InventoryPOS
             this.AutoScaleMode = AutoScaleMode.Font;
             this.ClientSize = new Size(1200, 800);
             this.Name = "MainForm";
-            this.Text = "InventoryPOS - Clothing Inventory for Resale";
+            this.Text = $"InventoryPOS v{VersionHelper.AppVersion} - Clothing Inventory for Resale";
             this.StartPosition = FormStartPosition.CenterScreen;
             // Start maximized to use full screen on startup
             this.WindowState = FormWindowState.Maximized;
@@ -158,6 +158,16 @@ namespace InventoryPOS
             };
             menuView.DropDownItems.Add(menuColumns);
             menuStrip.Items.Add(menuView);
+
+            // Help menu with About
+            var menuHelp = new ToolStripMenuItem("&Help");
+            var menuAbout = new ToolStripMenuItem("&About", null, MenuAbout_Click)
+            {
+                ShortcutKeys = Keys.F1,
+                ToolTipText = "About InventoryPOS"
+            };
+            menuHelp.DropDownItems.Add(menuAbout);
+            menuStrip.Items.Add(menuHelp);
 
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
@@ -278,6 +288,15 @@ namespace InventoryPOS
         {
             using var form = new ProfitCalculatorForm();
             form.ShowDialog(this);
+        }
+
+        private void MenuAbout_Click(object? sender, EventArgs e)
+        {
+            MessageBox.Show(
+                $"InventoryPOS\nVersion {Services.VersionHelper.AppVersion}\n\nClothing inventory management for resale.",
+                "About InventoryPOS",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private async void MenuConfiguration_Click(object? sender, EventArgs e)
@@ -1253,6 +1272,52 @@ namespace InventoryPOS
             lblTotalEarnings.Text = $"Total Earnings: {totalEarnings:C2}";
         }
 
+        /// <summary>
+        /// Re-applies the current filter and/or sort to the display list after
+        /// the underlying data has changed (e.g., after editing an item).
+        /// This preserves any active column filter instead of resetting to the
+        /// full list. If no filter/sort is active, the full list is shown.
+        /// </summary>
+        private void RestoreFilteredOrSortedDisplay()
+        {
+            // If a column filter is active, re-apply it to the (now updated) master list
+            if (!string.IsNullOrEmpty(_currentFilterColumn) && _currentFilterColumn != "Search")
+            {
+                var filtered = _allItems
+                    .Where(i => MatchesFilter(i, _currentFilterColumn, _currentFilterValue))
+                    .ToList();
+                _displayList = filtered;
+                BindGrid(_displayList);
+                UpdateCount(_displayList);
+                UpdateFilterIndicator();
+            }
+            else if (_currentFilterColumn == "Search")
+            {
+                // Re-apply the text search filter instead of losing it
+                PerformSearch();
+            }
+            else if (_sortStates.Count == 1)
+            {
+                // No filter, but a sort is active — re-sort the full list
+                var kv = _sortStates.First();
+                var asc = kv.Value == SortOrder.Ascending;
+                var sorted = asc
+                    ? _allItems.OrderBy(i => GetPropertyValue(i, kv.Key), Comparer<object>.Create(ComparePropertyValues)).ToList()
+                    : _allItems.OrderByDescending(i => GetPropertyValue(i, kv.Key), Comparer<object>.Create(ComparePropertyValues)).ToList();
+                _displayList = sorted;
+                BindGrid(_displayList);
+                UpdateCount(_displayList);
+                UpdateSortGlyphs();
+            }
+            else
+            {
+                // No filter or sort — show the full list
+                _displayList = _allItems.ToList();
+                BindGrid(_displayList);
+                UpdateCount(_displayList);
+            }
+        }
+
         private void DgvInventory_SelectionChanged(object? sender, EventArgs e)
         {
             var hasSelection = dgvInventory.SelectedRows.Count > 0;
@@ -1430,8 +1495,10 @@ namespace InventoryPOS
                 lblStatus.Text = "Saving...";
                 await _repository.AddAsync(item);
                 _allItems.Insert(0, item);
-                BindGrid(_allItems);
-                UpdateCount();
+
+                // Re-bind preserving any active filter or sort so the column
+                // filter is not cleared after adding a new item.
+                RestoreFilteredOrSortedDisplay();
                 lblStatus.Text = "Item added successfully";
                 _logger.LogInfo($"Item added successfully. SKU: {item.SKU}, Id: {item.Id}");
             }
@@ -1471,8 +1538,9 @@ namespace InventoryPOS
                     _allItems[index] = item;
                 }
 
-                BindGrid(_allItems);
-                UpdateCount();
+                // Re-bind preserving any active filter or sort so the column
+                // filter is not cleared after editing an item.
+                RestoreFilteredOrSortedDisplay();
                 lblStatus.Text = "Item updated successfully";
                 _logger.LogInfo($"Item updated successfully. SKU: {item.SKU}, Id: {item.Id}");
             }
