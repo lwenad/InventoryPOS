@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
+using InventoryPOS.Models;
 
 namespace InventoryPOS.Services
 {
@@ -13,6 +14,12 @@ namespace InventoryPOS.Services
     {
         private static readonly Lazy<LoggerService> _instance = new(() => new LoggerService());
         public static LoggerService Instance => _instance.Value;
+
+        /// <summary>
+        /// Custom log folder path set via InitializeFromUiState, if any.
+        /// Falls back to default %LOCALAPPDATA%\InventoryPOS\logs if not set.
+        /// </summary>
+        public static string? CustomLogFolderPath { get; set; }
 
         private readonly string _logFolder;
         private readonly object _lock = new();
@@ -35,11 +42,28 @@ namespace InventoryPOS.Services
         /// </summary>
         public bool IsDebugEnabled { get; set; } = false;
 
+        /// <summary>
+        /// Creates a new LoggerService instance. The log folder is determined
+        /// by CustomLogFolderPath static property if set, otherwise falls back to
+        /// the default %LOCALAPPDATA%\InventoryPOS\logs path.
+        /// </summary>
         private LoggerService()
         {
+            // Determine log folder: use custom path if set, otherwise default
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            _logFolder = Path.Combine(appDataPath, "InventoryPOS", "logs");
-            Directory.CreateDirectory(_logFolder);
+            var defaultLogFolder = Path.Combine(appDataPath, "InventoryPOS", "logs");
+
+            if (!string.IsNullOrWhiteSpace(CustomLogFolderPath))
+            {
+                _logFolder = CustomLogFolderPath;
+                // Ensure the directory exists
+                Directory.CreateDirectory(_logFolder);
+            }
+            else
+            {
+                _logFolder = defaultLogFolder;
+                Directory.CreateDirectory(_logFolder);
+            }
 
             _buffer = new StringBuilder();
             _currentLogDate = DateTime.Today;
@@ -172,6 +196,23 @@ namespace InventoryPOS.Services
             lock (_lock)
             {
                 FlushBufferNow();
+            }
+        }
+
+        /// <summary>
+        /// Initializes the logger with a custom log folder path from UiState.
+        /// Call this after loading UiState in your application startup flow.
+        /// </summary>
+        /// <param name="uiState">UI state containing the optional LogFolderPath.</param>
+        public static void InitializeFromUiState(UiState uiState)
+        {
+            if (uiState != null && !string.IsNullOrWhiteSpace(uiState.LogFolderPath))
+            {
+                CustomLogFolderPath = uiState.LogFolderPath;
+            }
+            else
+            {
+                CustomLogFolderPath = null;
             }
         }
     }

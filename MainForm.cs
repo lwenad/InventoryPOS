@@ -303,8 +303,20 @@ namespace InventoryPOS
 
         private async void MenuConfiguration_Click(object? sender, EventArgs e)
         {
+            // Load saved UI state first so preserved values (like DefaultListingPlatforms)
+            // are available before we build the current state on top of them.
+            var savedUiState = await _repository.LoadUiStateAsync();
+
             var currentUiState = BuildCurrentState();
-            currentUiState.PictureFolderPath = await _repository.LoadUiStateAsync() is { } ui ? ui.PictureFolderPath : null;
+            // Restore saved values that BuildCurrentState would otherwise reset
+            if (savedUiState != null)
+            {
+                currentUiState.DefaultListingPlatforms = savedUiState.DefaultListingPlatforms;
+                currentUiState.MaxImagesPerSku = savedUiState.MaxImagesPerSku;
+                currentUiState.ConfirmBeforeDelete = savedUiState.ConfirmBeforeDelete;
+                currentUiState.LogFolderPath = savedUiState.LogFolderPath;
+                currentUiState.PictureFolderPath = savedUiState.PictureFolderPath;
+            }
 
             using var form = new ApplicationConfigurationForm(currentUiState, OnConfigurationSaved);
             form.ShowDialog(this);
@@ -1057,6 +1069,11 @@ namespace InventoryPOS
                 FilterValue = _currentFilterValue,
                 LastFilePath = _repository.CurrentFilePath,
                 PictureFolderPath = _pictureFolderPath,
+                LogFolderPath = _logger.GetCurrentLogFilePath(), // save the current log folder path
+                DefaultListingPlatforms = // determined by last used profit calculator context
+                    null, // TODO: could store last platform selection if desired
+                MaxImagesPerSku = 20, // default, will be overridden by config
+                ConfirmBeforeDelete = true, // default, will be overridden by config
                 HiddenColumns = _hiddenColumns.Count > 0 ? _hiddenColumns.ToList() : null
             };
         }
@@ -1135,6 +1152,13 @@ namespace InventoryPOS
         private async void MainForm_Load(object? sender, EventArgs e)
         {
             await LoadDataAsync();
+
+            // Initialize logger from saved UI state so custom log folder path takes effect
+            var ui = await _repository.LoadUiStateAsync();
+            if (ui != null)
+            {
+                LoggerService.InitializeFromUiState(ui);
+            }
         }
 
         private async Task LoadDataAsync()
@@ -1739,13 +1763,21 @@ namespace InventoryPOS
                 // filter is not cleared after editing an item.
                 RestoreFilteredOrSortedDisplay();
 
-                // Force the photo column cells to re-resolve from disk and
-                // restore the grid selection to the edited item (deferred to
-                // avoid races with the grid rebuilding rows).
+                // Ensure sort is applied and visible after editing.
+                // RestoreFilteredOrSortedDisplay() may re-sort if _sortStates has one entry,
+                // but we explicitly trigger the sort update so the UI reflects the correct
+                // sort order and glyph immediately after the edit.
+                UpdateSortGlyphs();
+
+                // Restore selection to the edited item and refresh the photo column
+                // (deferred in a single BeginInvoke to avoid races with the grid
+                // rebuilding rows caused by RestoreFilteredOrSortedDisplay calling
+                // BindGrid which clears the selection). Refresh first so the
+                // photo cells are ready, then restore selection.
                 this.BeginInvoke((MethodInvoker)(() =>
                 {
-                    RestoreGridSelection(item.Id);
                     RefreshPhotoColumn();
+                    RestoreGridSelection(item.Id);
                 }));
 
                 lblStatus.Text = "Item updated successfully";
@@ -1766,13 +1798,19 @@ namespace InventoryPOS
             var selectedItem = dgvInventory.SelectedRows[0].DataBoundItem as InventoryItem;
             if (selectedItem == null) return;
 
-            var result = MessageBox.Show(
-                $"Delete '{selectedItem.Title}' (SKU: {selectedItem.SKU})?",
-                "Confirm Delete",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
+            // Check if confirmation is required per configuration
+            bool confirmBeforeDelete = await _repository.LoadUiStateAsync() is { } uiState
+                && uiState.ConfirmBeforeDelete;
+            if (confirmBeforeDelete)
+            {
+                var result = MessageBox.Show(
+                    $"Delete '{selectedItem.Title}' (SKU: {selectedItem.SKU})?",
+                    "Confirm Delete",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
 
-            if (result != DialogResult.Yes) return;
+                if (result != DialogResult.Yes) return;
+            }
 
             try
             {

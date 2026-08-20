@@ -623,9 +623,26 @@ namespace InventoryPOS.Forms
             }
             else if (_isNew)
             {
-                // Default platform for new items
-                int poshIndex = chkPlatform.Items.IndexOf("Poshmark");
-                if (poshIndex >= 0) chkPlatform.SetItemChecked(poshIndex, true);
+                // Default listing platforms for new items - use configured defaults if available
+                if (!string.IsNullOrWhiteSpace(_uiState.DefaultListingPlatforms))
+                {
+                    var savedPlatforms = _uiState.DefaultListingPlatforms
+                        .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var platform in savedPlatforms)
+                    {
+                        int index = chkPlatform.Items.IndexOf(platform.Trim());
+                        if (index >= 0)
+                        {
+                            chkPlatform.SetItemChecked(index, true);
+                        }
+                    }
+                }
+                else
+                {
+                    // Fall back to Poshmark if no default configured
+                    int poshIndex = chkPlatform.Items.IndexOf("Poshmark");
+                    if (poshIndex >= 0) chkPlatform.SetItemChecked(poshIndex, true);
+                }
             }
 
             // Load sold price and enable/disable controls based on status
@@ -907,7 +924,7 @@ private async void LoadPictures()
             if (imageFiles == null || imageFiles.Count == 0)
                 return;
 
-            // Check if we've reached the limit of 20 pictures
+            // Check if we've reached the max pictures limit
             var skuFolder = Path.Combine(_uiState?.PictureFolderPath ?? string.Empty, "pictures", _item.SKU);
             int existingPictures = 0;
             if (Directory.Exists(skuFolder))
@@ -915,9 +932,9 @@ private async void LoadPictures()
                 existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
             }
 
-            if (existingPictures + imageFiles.Count > 20)
+            if (existingPictures + imageFiles.Count > _uiState.MaxImagesPerSku)
             {
-                MessageBox.Show("You cannot exceed 20 pictures for this item.", "Limit Reached", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"You cannot exceed {_uiState.MaxImagesPerSku} pictures for this item.", "Limit Reached", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

@@ -14,6 +14,8 @@ namespace InventoryPOS.Forms
 
         private TextBox txtPictureFolderPath = null!;
         private Button btnBrowse = null!;
+        private TextBox txtLogFolderPath = null!;
+        private Button btnBrowseLog = null!;
         private Button btnSave = null!;
         private Button btnCancel = null!;
 
@@ -31,10 +33,10 @@ namespace InventoryPOS.Forms
         {
             this.SuspendLayout();
 
-            // Form settings
+            // Form settings - Increased height to prevent overlapping
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(550, 200);
+            this.ClientSize = new Size(550, 275);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -45,8 +47,8 @@ namespace InventoryPOS.Forms
             var lblPictureFolder = new Label
             {
                 Text = "Picture Folder:",
-                Location = new Point(20, 30),
-                Size = new Size(100, 20),
+                Location = new Point(20, 20),
+                Size = new Size(110, 20),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             this.Controls.Add(lblPictureFolder);
@@ -54,38 +56,152 @@ namespace InventoryPOS.Forms
             // Picture Folder Path TextBox
             txtPictureFolderPath = new TextBox
             {
-                Location = new Point(130, 28),
-                Size = new Size(300, 25),
+                Location = new Point(135, 18),
+                Size = new Size(295, 25),
                 ReadOnly = true
             };
             this.Controls.Add(txtPictureFolderPath);
 
-            // Browse Button
+            // Browse Button (Picture)
             btnBrowse = new Button
             {
                 Text = "Browse...",
-                Location = new Point(440, 27),
+                Location = new Point(440, 17),
                 Size = new Size(90, 27)
             };
             btnBrowse.Click += BtnBrowse_Click;
             this.Controls.Add(btnBrowse);
 
-            // Help Label
+            // Help Label for Pictures
             var lblHelp = new Label
             {
                 Text = "Pictures will be organized in SKU subfolders under this location.",
-                Location = new Point(130, 60),
-                Size = new Size(400, 20),
+                Location = new Point(135, 47),
+                Size = new Size(395, 18),
                 ForeColor = Color.Gray,
-                Font = new Font("Segoe UI", 8F)
+                Font = new Font("Segoe UI", 7.5F)
             };
             this.Controls.Add(lblHelp);
+
+            // Log Folder Path Label
+            var lblLogFolder = new Label
+            {
+                Text = "Log Folder:",
+                Location = new Point(20, 75),
+                Size = new Size(110, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblLogFolder);
+
+            // Log Folder Path TextBox
+            txtLogFolderPath = new TextBox
+            {
+                Location = new Point(135, 73),
+                Size = new Size(295, 25),
+                ReadOnly = true
+            };
+            this.Controls.Add(txtLogFolderPath);
+
+            // Browse Log Button
+            btnBrowseLog = new Button
+            {
+                Text = "Browse...",
+                Location = new Point(440, 72),
+                Size = new Size(90, 27)
+            };
+            btnBrowseLog.Click += BtnBrowseLog_Click;
+            this.Controls.Add(btnBrowseLog);
+
+            // Default Listing Platforms Label
+            var lblDefaultPlatform = new Label
+            {
+                Text = "Default Listing Platforms:",
+                Location = new Point(20, 110),
+                Size = new Size(160, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblDefaultPlatform);
+
+            // Default Listing Platforms CheckedListBox
+            var chkDefaultPlatforms = new CheckedListBox
+            {
+                Location = new Point(190, 108),
+                Size = new Size(150, 75),
+                Items = { "eBay", "Poshmark", "Depop" }
+            };
+
+            if (!string.IsNullOrWhiteSpace(_uiState.DefaultListingPlatforms))
+            {
+                var savedPlatforms = _uiState.DefaultListingPlatforms
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var platform in savedPlatforms)
+                {
+                    int index = chkDefaultPlatforms.Items.IndexOf(platform.Trim());
+                    if (index >= 0)
+                    {
+                        chkDefaultPlatforms.SetItemChecked(index, true);
+                    }
+                }
+            }
+
+            chkDefaultPlatforms.ItemCheck += (s, e) =>
+            {
+                var selected = new List<string>();
+                for (int i = 0; i < chkDefaultPlatforms.Items.Count; i++)
+                {
+                    if (chkDefaultPlatforms.GetItemChecked(i))
+                    {
+                        selected.Add(chkDefaultPlatforms.Items[i].ToString()!);
+                    }
+                }
+                _uiState.DefaultListingPlatforms = string.Join(", ", selected);
+            };
+            this.Controls.Add(chkDefaultPlatforms);
+
+            // Max Images per SKU Label
+            var lblMaxImages = new Label
+            {
+                Text = "Max Images/SKU:",
+                Location = new Point(20, 193),
+                Size = new Size(110, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblMaxImages);
+
+            // Max Images per SKU NumericUpDown
+            var nudMaxImages = new NumericUpDown
+            {
+                Location = new Point(135, 191),
+                Size = new Size(150, 25),
+                Minimum = 1,
+                Maximum = 100,
+                Value = _uiState.MaxImagesPerSku
+            };
+            nudMaxImages.ValueChanged += (s, e) =>
+            {
+                _uiState.MaxImagesPerSku = (int)nudMaxImages.Value;
+            };
+            this.Controls.Add(nudMaxImages);
+
+            // Confirm Before Delete CheckBox
+            var chkConfirmDelete = new CheckBox
+            {
+                Text = "Confirm before delete",
+                Location = new Point(20, 226),
+                Size = new Size(200, 24),
+                Checked = _uiState.ConfirmBeforeDelete
+            };
+            chkConfirmDelete.CheckedChanged += (s, e) =>
+            {
+                _uiState.ConfirmBeforeDelete = chkConfirmDelete.Checked;
+            };
+            this.Controls.Add(chkConfirmDelete);
 
             // Save Button
             btnSave = new Button
             {
                 Text = "Save",
-                Location = new Point(340, 120),
+                Location = new Point(340, 220),
                 Size = new Size(90, 35),
                 BackColor = Color.FromArgb(0, 122, 204),
                 ForeColor = Color.White,
@@ -99,7 +215,7 @@ namespace InventoryPOS.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(440, 120),
+                Location = new Point(440, 220),
                 Size = new Size(90, 35),
                 DialogResult = DialogResult.Cancel,
                 FlatStyle = FlatStyle.Flat
@@ -117,6 +233,7 @@ namespace InventoryPOS.Forms
         private void LoadCurrentSettings()
         {
             txtPictureFolderPath.Text = _uiState.PictureFolderPath ?? string.Empty;
+            txtLogFolderPath.Text = _uiState.LogFolderPath ?? string.Empty;
         }
 
         private void BtnBrowse_Click(object? sender, EventArgs e)
@@ -136,6 +253,23 @@ namespace InventoryPOS.Forms
             }
         }
 
+        private void BtnBrowseLog_Click(object? sender, EventArgs e)
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Select the folder for storing log files",
+                ShowNewFolderButton = true,
+                SelectedPath = !string.IsNullOrEmpty(_uiState.LogFolderPath) && Directory.Exists(_uiState.LogFolderPath)
+                    ? _uiState.LogFolderPath
+                    : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            };
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                txtLogFolderPath.Text = dialog.SelectedPath;
+            }
+        }
+
         private void BtnSave_Click(object? sender, EventArgs e)
         {
             var updatedState = new UiState
@@ -146,11 +280,15 @@ namespace InventoryPOS.Forms
                 FilterValue = _uiState.FilterValue,
                 LastFilePath = _uiState.LastFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
+                LogFolderPath = txtLogFolderPath.Text.Trim(),
+                DefaultListingPlatforms = _uiState.DefaultListingPlatforms,
+                MaxImagesPerSku = _uiState.MaxImagesPerSku,
+                ConfirmBeforeDelete = _uiState.ConfirmBeforeDelete,
                 HiddenColumns = _uiState.HiddenColumns
             };
 
             _onSave(updatedState);
-            _logger.LogInfo($"Configuration saved. PictureFolderPath: '{updatedState.PictureFolderPath}'");
+            _logger.LogInfo($"Configuration saved. PictureFolderPath: '{updatedState.PictureFolderPath}', LogFolderPath: '{updatedState.LogFolderPath}', DefaultPlatforms: '{updatedState.DefaultListingPlatforms}', MaxImages: {updatedState.MaxImagesPerSku}");
             this.DialogResult = DialogResult.OK;
             this.Close();
         }
