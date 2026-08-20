@@ -21,7 +21,7 @@ namespace InventoryPOS.Services
         /// </summary>
         public static string? CustomLogFolderPath { get; set; }
 
-        private readonly string _logFolder;
+        private string _logFolder;
         private readonly object _lock = new();
         private StringBuilder? _buffer;
         private readonly System.Threading.Timer _flushTimer;
@@ -202,6 +202,8 @@ namespace InventoryPOS.Services
         /// <summary>
         /// Initializes the logger with a custom log folder path from UiState.
         /// Call this after loading UiState in your application startup flow.
+        /// This updates the existing singleton instance so changes take effect
+        /// immediately without restarting the application.
         /// </summary>
         /// <param name="uiState">UI state containing the optional LogFolderPath.</param>
         public static void InitializeFromUiState(UiState uiState)
@@ -209,10 +211,48 @@ namespace InventoryPOS.Services
             if (uiState != null && !string.IsNullOrWhiteSpace(uiState.LogFolderPath))
             {
                 CustomLogFolderPath = uiState.LogFolderPath;
+                Instance.ApplyCustomLogFolder(uiState.LogFolderPath);
             }
             else
             {
                 CustomLogFolderPath = null;
+                Instance.ApplyCustomLogFolder(null);
+            }
+        }
+
+        /// <summary>
+        /// Updates the log folder on the already-created singleton instance.
+        /// This allows changing the log folder at runtime without restarting.
+        /// </summary>
+        /// <param name="customLogFolderPath">Custom log folder path, or null to revert to default.</param>
+        private void ApplyCustomLogFolder(string? customLogFolderPath)
+        {
+            lock (_lock)
+            {
+                try
+                {
+                    // Flush any buffered data to the old location before switching
+                    FlushBufferNow();
+
+                    // Determine the new log folder
+                    var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                    var defaultLogFolder = Path.Combine(appDataPath, "InventoryPOS", "logs");
+
+                    _logFolder = !string.IsNullOrWhiteSpace(customLogFolderPath)
+                        ? customLogFolderPath
+                        : defaultLogFolder;
+
+                    // Ensure the directory exists
+                    Directory.CreateDirectory(_logFolder);
+
+                    // Update current log file path for today
+                    _currentLogDate = DateTime.Today;
+                    _currentLogFilePath = Path.Combine(_logFolder, $"InventoryPOS_{_currentLogDate:yyyyMMdd}.log");
+                }
+                catch
+                {
+                    // Swallow logging errors so logging never crashes the app
+                }
             }
         }
     }

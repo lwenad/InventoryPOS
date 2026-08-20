@@ -624,9 +624,9 @@ namespace InventoryPOS.Forms
             else if (_isNew)
             {
                 // Default listing platforms for new items - use configured defaults if available
-                if (!string.IsNullOrWhiteSpace(_uiState.DefaultListingPlatforms))
+                if (!string.IsNullOrWhiteSpace(_uiState!.DefaultListingPlatforms))
                 {
-                    var savedPlatforms = _uiState.DefaultListingPlatforms
+                    var savedPlatforms = _uiState!.DefaultListingPlatforms
                         .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                     foreach (var platform in savedPlatforms)
                     {
@@ -932,9 +932,9 @@ private async void LoadPictures()
                 existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
             }
 
-            if (existingPictures + imageFiles.Count > _uiState.MaxImagesPerSku)
+            if (existingPictures + imageFiles.Count > _uiState!.MaxImagesPerSku)
             {
-                MessageBox.Show($"You cannot exceed {_uiState.MaxImagesPerSku} pictures for this item.", "Limit Reached", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"You cannot exceed {_uiState!.MaxImagesPerSku} pictures for this item.", "Limit Reached", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

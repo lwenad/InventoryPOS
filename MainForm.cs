@@ -328,6 +328,10 @@ namespace InventoryPOS
             // Update the cached picture folder path and invalidate the thumbnail cache
             _pictureFolderPath = updatedState.PictureFolderPath;
             _photoCache.Clear();
+
+            // Update the logger with any custom log folder path
+            LoggerService.InitializeFromUiState(updatedState);
+
             lblStatus.Text = "Configuration saved";
         }
 

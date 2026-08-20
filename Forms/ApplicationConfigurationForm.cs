@@ -289,6 +289,17 @@ namespace InventoryPOS.Forms
 
             _onSave(updatedState);
             _logger.LogInfo($"Configuration saved. PictureFolderPath: '{updatedState.PictureFolderPath}', LogFolderPath: '{updatedState.LogFolderPath}', DefaultPlatforms: '{updatedState.DefaultListingPlatforms}', MaxImages: {updatedState.MaxImagesPerSku}");
+
+            // Verify the log folder was created successfully
+            if (!string.IsNullOrWhiteSpace(updatedState.LogFolderPath) && !Directory.Exists(updatedState.LogFolderPath))
+            {
+                MessageBox.Show(
+                    $"Log folder could not be created: {updatedState.LogFolderPath}\nLogs will continue to use the default location.",
+                    "Log Folder Warning",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+
             this.DialogResult = DialogResult.OK;
             this.Close();
         }
