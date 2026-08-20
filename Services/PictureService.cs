@@ -56,11 +56,22 @@ namespace InventoryPOS.Services
             if (folder == null || !Directory.Exists(folder))
                 return null;
 
-            var files = Directory.EnumerateFiles(folder)
-                .Where(f => ImageExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
-                .ToList();
+            try
+            {
+                var files = Directory.GetFiles(folder)
+                    .Where(f => ImageExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    .ToList();
 
-            return files.FirstOrDefault();
+                return files.FirstOrDefault();
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
         }
 
         /// <summary>

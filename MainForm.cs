@@ -1277,7 +1277,64 @@ namespace InventoryPOS
             dgvInventory.ClearSelection();
             UpdateSortGlyphs();
 
-            // Force a repaint so CellFormatting runs and image cells are rendered
+            // Force a repaint so image cells are rendered
+            dgvInventory.Invalidate();
+            dgvInventory.Refresh();
+        }
+
+        /// <summary>
+        /// Forces re-population of the Photo column cells after the thumbnail
+        /// cache has been invalidated (e.g. after adding or removing pictures
+        /// via the edit form). Directly sets cell values so the grid reflects
+        /// the current on-disk state without requiring a full rebind.
+        /// </summary>
+        private void RefreshPhotoColumn()
+        {
+            // Find the Photo column index
+            var photoColIdx = -1;
+            for (int i = 0; i < dgvInventory.Columns.Count; i++)
+            {
+                if (string.Equals(dgvInventory.Columns[i].Name, "Photo", StringComparison.OrdinalIgnoreCase))
+                {
+                    photoColIdx = i;
+                    break;
+                }
+            }
+            if (photoColIdx < 0) return;
+
+            // Set cell values directly from the cache (populated lazily by CellFormatting)
+            for (int r = 0; r < dgvInventory.Rows.Count; r++)
+            {
+                if (dgvInventory.Rows[r].IsNewRow) continue;
+
+                var cell = dgvInventory.Rows[r].Cells[photoColIdx];
+                if (cell is DataGridViewImageCell imgCell)
+                {
+                    var item = dgvInventory.Rows[r].DataBoundItem as InventoryItem;
+                    var sku = item?.SKU ?? string.Empty;
+
+                    if (!_photoCache.TryGetValue(sku, out var cachedImage))
+                    {
+                        if (string.IsNullOrEmpty(_pictureFolderPath))
+                        {
+                            cachedImage = PictureService.GetPlaceholderImage();
+                        }
+                        else
+                        {
+                            var picPath = PictureService.GetFirstPicturePath(_pictureFolderPath, sku);
+                            cachedImage = string.IsNullOrEmpty(picPath)
+                                ? PictureService.GetPlaceholderImage()
+                                : PictureService.LoadThumbnail(picPath);
+                            if (cachedImage == null)
+                                cachedImage = PictureService.GetPlaceholderImage();
+                        }
+                        _photoCache[sku] = cachedImage;
+                    }
+
+                    imgCell.Value = cachedImage;
+                }
+            }
+
             dgvInventory.Invalidate();
             dgvInventory.Refresh();
         }
@@ -1612,12 +1669,24 @@ namespace InventoryPOS
             if (selectedItem == null) return;
 
             using var form = new InventoryEditForm(selectedItem);
-            if (form.ShowDialog(this) == DialogResult.OK)
+            var result = form.ShowDialog(this);
+            if (result == DialogResult.OK)
             {
                 // Clear the photo cache — pictures may have been added or removed
                 // via the Picture Management tab in the edit form.
                 _photoCache.Clear();
                 _ = SaveEditedItemAsync(form.ResultItem);
+            }
+            else if (form.PicturesChanged)
+            {
+                // Pictures were added/removed while editing but the user did not
+                // save other item changes. Invalidate the photo cache so the
+                // main grid reflects on-disk picture changes without requiring
+                // an application restart.
+                _photoCache.Clear();
+                RestoreFilteredOrSortedDisplay();
+                // Force the photo column to refresh on the UI thread.
+                this.BeginInvoke((MethodInvoker)(() => RefreshPhotoColumn()));
             }
         }
 
@@ -1641,6 +1710,14 @@ namespace InventoryPOS
                 // Re-bind preserving any active filter or sort so the column
                 // filter is not cleared after editing an item.
                 RestoreFilteredOrSortedDisplay();
+
+                // Force the photo column cells to re-resolve from disk
+                // (deferred to avoid races with the grid rebuilding rows)
+                this.BeginInvoke((MethodInvoker)(() =>
+                {
+                    RefreshPhotoColumn();
+                }));
+
                 lblStatus.Text = "Item updated successfully";
                 _logger.LogInfo($"Item updated successfully. SKU: {item.SKU}, Id: {item.Id}");
             }

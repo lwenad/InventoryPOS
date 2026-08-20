@@ -12,6 +12,11 @@ namespace InventoryPOS.Forms
 {
     public partial class InventoryEditForm : Form
     {
+        // Indicates whether pictures for this SKU were added/removed while
+        // the form was open. MainForm can inspect this after the dialog
+        // closes to know whether to invalidate its photo cache.
+        public bool PicturesChanged { get; private set; } = false;
+
         private readonly InventoryItem _item;
         private readonly bool _isNew;
         private readonly LoggerService _logger;
@@ -966,6 +971,10 @@ private async void LoadPictures()
                 // Refresh the picture display
                 LoadPictures();
 
+                // Mark that pictures changed while the form was open so callers
+                // (e.g. MainForm) can react after the dialog closes.
+                PicturesChanged = true;
+
                 MessageBox.Show($"Successfully added {copiedFiles.Count} picture(s) to SKU {_item.SKU}.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 _logger.LogInfo($"Successfully added {copiedFiles.Count} picture(s) to SKU {_item.SKU}");
             }
@@ -990,10 +999,14 @@ private async void LoadPictures()
             {
                 try
                 {
+
                     File.Delete(_selectedPicturePath);
 
                     // Refresh the picture display
                     LoadPictures();
+
+                    // Mark that pictures changed while the form was open
+                    PicturesChanged = true;
 
                     MessageBox.Show("Picture removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     _logger.LogInfo($"Picture removed successfully. SKU: {_item.SKU}, File: {Path.GetFileName(_selectedPicturePath)}");
@@ -1027,6 +1040,9 @@ private async void LoadPictures()
 
                     // Refresh the picture display
                     LoadPictures();
+
+                    // Mark that pictures changed while the form was open
+                    PicturesChanged = true;
 
                     MessageBox.Show("All pictures removed successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     _logger.LogInfo($"All pictures cleared for SKU {_item.SKU}");
