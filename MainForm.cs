@@ -57,6 +57,8 @@ namespace InventoryPOS
     private ToolStripStatusLabel lblSoldCount = null!;
     private ToolStripStatusLabel lblCreatedCount = null!;
         private Dictionary<string, string> _originalHeaderTexts = new();
+        private string? _pictureFolderPath;
+        private readonly Dictionary<string, Image?> _photoCache = new(StringComparer.OrdinalIgnoreCase);
 
         public MainForm()
         {
@@ -311,6 +313,9 @@ namespace InventoryPOS
         private async void OnConfigurationSaved(UiState updatedState)
         {
             await _repository.SaveUiStateAsync(updatedState);
+            // Update the cached picture folder path and invalidate the thumbnail cache
+            _pictureFolderPath = updatedState.PictureFolderPath;
+            _photoCache.Clear();
             lblStatus.Text = "Configuration saved";
         }
 
@@ -407,7 +412,7 @@ namespace InventoryPOS
                 Dock = DockStyle.Fill,
                 AllowUserToAddRows = false,
                 AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false,
+                AllowUserToResizeRows = true,
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
@@ -420,7 +425,7 @@ namespace InventoryPOS
                 ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
                 EnableHeadersVisualStyles = false,
                 RowHeadersVisible = false,
-                RowTemplate = { Height = 30 },
+                RowTemplate = { Height = 72 },
                 GridColor = Color.FromArgb(224, 224, 224)
             };
 
@@ -466,6 +471,7 @@ namespace InventoryPOS
             // Define columns
             dgvInventory.Columns.AddRange(new DataGridViewColumn[]
             {
+                CreateImageColumn("Photo", "Photo", 70),
                 CreateColumn("Status", "Status", 50, false),
                 CreateColumn("SKU", "SKU", 100, true),
                 CreateColumn("Brand", "Brand", 100, true),
@@ -912,6 +918,28 @@ namespace InventoryPOS
             return column;
         }
 
+        /// <summary>
+        /// Creates a <see cref="DataGridViewImageColumn"/> for thumbnail display
+        /// (used by the Photo column). The image is centered and zoomed to fit the cell.
+        /// </summary>
+        private DataGridViewImageColumn CreateImageColumn(string dataPropertyName, string headerText, int width)
+        {
+            var column = new DataGridViewImageColumn
+            {
+                DataPropertyName = dataPropertyName,
+                HeaderText = headerText,
+                Width = width,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    Alignment = DataGridViewContentAlignment.MiddleCenter
+                },
+                ImageLayout = DataGridViewImageCellLayout.Zoom,
+                MinimumWidth = 70
+            };
+            return column;
+        }
+
         #region Column Visibility
 
         /// <summary>
@@ -1024,6 +1052,7 @@ namespace InventoryPOS
                 FilterColumn = _currentFilterColumn,
                 FilterValue = _currentFilterValue,
                 LastFilePath = _repository.CurrentFilePath,
+                PictureFolderPath = _pictureFolderPath,
                 HiddenColumns = _hiddenColumns.Count > 0 ? _hiddenColumns.ToList() : null
             };
         }
@@ -1113,6 +1142,10 @@ namespace InventoryPOS
 
                 // Load UI state first so we can restore the last used data file path before loading data
                 var ui = await _repository.LoadUiStateAsync();
+                // Capture the picture folder path for the photo grid column
+                if (ui?.PictureFolderPath != null)
+                    _pictureFolderPath = ui.PictureFolderPath;
+
                 if (ui != null && !string.IsNullOrEmpty(ui.LastFilePath) && System.IO.File.Exists(ui.LastFilePath))
                 {
                     _repository.SetFilePath(ui.LastFilePath);
@@ -1329,9 +1362,44 @@ namespace InventoryPOS
         {
             try
             {
-                if (e.Value == null) return;
+                if (e.RowIndex < 0) return;
 
                 var col = dgvInventory.Columns[e.ColumnIndex];
+
+                // Photo column: resolve the thumbnail from the SKU folder
+                if (string.Equals(col.DataPropertyName, "Photo", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (e.RowIndex < _bindingList.Count)
+                    {
+                        var item = _bindingList[e.RowIndex];
+                        var sku = item.SKU ?? string.Empty;
+
+                        if (!_photoCache.TryGetValue(sku, out var cachedImage))
+                        {
+                            if (string.IsNullOrEmpty(_pictureFolderPath))
+                            {
+                                cachedImage = PictureService.GetPlaceholderImage();
+                            }
+                            else
+                            {
+                                var picPath = PictureService.GetFirstPicturePath(_pictureFolderPath, sku);
+                                cachedImage = string.IsNullOrEmpty(picPath)
+                                    ? PictureService.GetPlaceholderImage()
+                                    : PictureService.LoadThumbnail(picPath);
+                                // Cache the result (including null failures by caching placeholder)
+                                if (cachedImage == null)
+                                    cachedImage = PictureService.GetPlaceholderImage();
+                            }
+                            _photoCache[sku] = cachedImage;
+                        }
+
+                        e.Value = cachedImage;
+                    }
+                    return;
+                }
+
+                if (e.Value == null) return;
+
                 // Color the Status text green when item is Sold
                 if (string.Equals(col.DataPropertyName, "Status", StringComparison.OrdinalIgnoreCase))
                 {
@@ -1496,6 +1564,9 @@ namespace InventoryPOS
                 await _repository.AddAsync(item);
                 _allItems.Insert(0, item);
 
+                // Invalidate the photo cache so new/edited items reflect their pictures
+                _photoCache.Clear();
+
                 // Re-bind preserving any active filter or sort so the column
                 // filter is not cleared after adding a new item.
                 RestoreFilteredOrSortedDisplay();
@@ -1537,6 +1608,9 @@ namespace InventoryPOS
                 {
                     _allItems[index] = item;
                 }
+
+                // Invalidate the photo cache so edited items reflect their updated pictures
+                _photoCache.Clear();
 
                 // Re-bind preserving any active filter or sort so the column
                 // filter is not cleared after editing an item.
@@ -1635,6 +1709,10 @@ namespace InventoryPOS
                             _displayList.RemoveAll(i => i.Id == idToRemove);
                         if (_preFilterDisplay != null && _preFilterDisplay.Any())
                             _preFilterDisplay.RemoveAll(i => i.Id == idToRemove);
+
+                        // Remove the deleted item's cached photo (if any)
+                        if (!string.IsNullOrEmpty(selectedItem.SKU))
+                            _photoCache.Remove(selectedItem.SKU);
 
                         // If nothing removed above, rebind as a final fallback
                         if (!removed)
