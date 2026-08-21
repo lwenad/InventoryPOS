@@ -1,0 +1,18 @@
+mode: Mainline
+branches:
+  main:
+    regex: ^main$
+    mode: Mainline
+    increment: Patch
+    prevent-increment-of-merged-branch-version: true
+  feature:
+    regex: ^features?[/-]
+    mode: Mainline
+    increment: Minor
+    pre-release-weight: 10000
+  pull-request:
+    regex: ^(pull|pull\-requests?)[/-]
+    mode: Mainline
+    increment: Patch
+    pre-release-weight: 30000
+tag-prefix: '[vV]'
