@@ -28,9 +28,10 @@ jobs:
 
     - name: GitVersion
       id: gitversion
-      uses: gittools/actions/gitversion@v5
+      uses: gittools/actions/gitversion/execute@v5
       with:
         useConfigFile: true
+        configFilePath: GitVersion.yml
 
     - name: Restore Dependencies
       run: dotnet restore
