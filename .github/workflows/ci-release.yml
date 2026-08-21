@@ -18,6 +18,8 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -26,7 +28,7 @@ jobs:
 
     - name: GitVersion
       id: gitversion
-      uses: gittools/actions/gitversion@v5
+      uses: gittools/actions/gitversion@v5.0.0
       with:
         useConfigFile: true
 
