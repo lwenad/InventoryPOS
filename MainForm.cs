@@ -154,6 +154,28 @@ namespace InventoryPOS
             };
             menuStrip.Items.Add(menuProfitCalculator);
 
+            // Marketplace menu
+            var menuMarketplace = new ToolStripMenuItem("&Marketplace");
+            var menuMarketplacePoshmark = new ToolStripMenuItem("&Poshmark", null, (s, e) => OpenMarketplaceUrl("https://poshmark.com"))
+            {
+                ToolTipText = "Open Poshmark website"
+            };
+            var menuMarketplaceEbay = new ToolStripMenuItem("&eBay", null, (s, e) => OpenMarketplaceUrl("https://ebay.com"))
+            {
+                ToolTipText = "Open eBay website"
+            };
+            var menuMarketplaceDepop = new ToolStripMenuItem("&Depop", null, (s, e) => OpenMarketplaceUrl("https://depop.com"))
+            {
+                ToolTipText = "Open Depop website"
+            };
+            menuMarketplace.DropDownItems.AddRange(new ToolStripItem[]
+            {
+                menuMarketplacePoshmark,
+                menuMarketplaceEbay,
+                menuMarketplaceDepop
+            });
+            menuStrip.Items.Add(menuMarketplace);
+
             menuView = new ToolStripMenuItem("&View");
             menuColumns = new ToolStripMenuItem("C&olumns")
             {
@@ -300,6 +322,25 @@ namespace InventoryPOS
                 "About InventoryPOS",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
+        }
+
+        private void OpenMarketplaceUrl(string url)
+        {
+            try
+            {
+                _logger.LogInfo($"Opening marketplace URL: {url}");
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to open marketplace URL: {url}", ex);
+                MessageBox.Show($"Failed to open website: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private async void MenuConfiguration_Click(object? sender, EventArgs e)
