@@ -1,0 +1,39 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    # Step 1: Check out the code from your repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # Step 2: Set up your build environment (Example: .NET for C# apps)
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # Step 3: Compile your Windows application
+    - name: Build Application Executable
+      run: dotnet publish -c Release -r win-x64 --self-contained true -o ./publish
+
+    # Step 4: Create the Installer package (Example using Inno Setup)
+    - name: Compile Installer with Inno Setup
+      import-codes: |
+        # If your repository contains an Inno Setup .iss script:
+      run: |
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ./installer-script.iss
+      # Note: 'windows-latest' runners have Inno Setup pre-installed.
+
+    # Step 5: Upload the final installer artifact to GitHub
+    - name: Upload Installer Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Windows-Installer
+        path: ./Output/*.exe
