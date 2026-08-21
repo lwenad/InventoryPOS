@@ -1,21 +1,15 @@
-mode: Mainline
+workflow: GitHubFlow/v1
 tag-prefix: '[vV]'
 
 branches:
   main:
-    regex: ^main$
-    mode: Mainline
     increment: Patch
     is-main-branch: true
     
   feature:
-    regex: ^features?[/-]
-    mode: Mainline
     increment: Minor
     pre-release-weight: 10000
     
   pull-request:
-    regex: ^(pull|pull\-requests?)[/-]
-    mode: Mainline
     increment: Patch
     pre-release-weight: 30000
