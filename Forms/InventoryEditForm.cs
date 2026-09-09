@@ -37,6 +37,7 @@ namespace InventoryPOS.Forms
         private CheckedListBox chkPlatform = null!; // Changed to CheckedListBox
         private Button btnSave = null!;
         private Button btnCancel = null!;
+        private Button btnAiFill = null!;
         private ComboBox cmbCondition = null!;
         private ComboBox cmbStatus = null!;
         private NumericUpDown numSoldPrice = null!;
@@ -477,6 +478,21 @@ namespace InventoryPOS.Forms
             mainPanel.Controls.Add(chkPlatform);
 
             y += 80;
+
+            // AI Fill Button
+            btnAiFill = new Button
+            {
+                Text = "AI Fill",
+                Location = new Point(130, y),
+                Size = new Size(140, 35),
+                BackColor = Color.FromArgb(106, 36, 255),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            btnAiFill.FlatAppearance.BorderSize = 0;
+            btnAiFill.Click += BtnAiFill_Click;
+            mainPanel.Controls.Add(btnAiFill);
 
             // Action Buttons
             btnSave = new Button
@@ -1155,6 +1171,153 @@ private async void LoadPictures()
             this.DialogResult = DialogResult.OK;
             _logger.LogInfo($"Item saved. SKU: {ResultItem.SKU}, Title: {ResultItem.Title}");
             this.Close();
+        }
+
+        /// <summary>
+        /// AI Fill button handler: checks for a configured API key and existing
+        /// pictures, uploads the first three images to Google AI (Gemini), and
+        /// populates the edit fields from the parsed response.
+        /// </summary>
+        private async void BtnAiFill_Click(object? sender, EventArgs e)
+        {
+            // 1. Check API key
+            if (string.IsNullOrWhiteSpace(_uiState?.GoogleAiApiKey))
+            {
+                MessageBox.Show(
+                    "Google AI API key is not configured. Please open Application Configuration (Ctrl+,) to set it up.",
+                    "AI Fill - No API Key",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 2. Check if pictures exist for this SKU
+            var skuFolder = PictureService.GetSkuPictureFolder(_uiState?.PictureFolderPath, _item.SKU);
+            if (skuFolder == null || !Directory.Exists(skuFolder))
+            {
+                MessageBox.Show(
+                    "No pictures found for this item. Please add pictures first using the Picture Management tab.",
+                    "AI Fill - No Pictures",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var imageFiles = Directory.GetFiles(skuFolder, "*.jpg")
+                .Concat(Directory.GetFiles(skuFolder, "*.jpeg"))
+                .Concat(Directory.GetFiles(skuFolder, "*.png"))
+                .Concat(Directory.GetFiles(skuFolder, "*.gif"))
+                .OrderBy(f => f)
+                .Take(3)
+                .ToList();
+
+            if (imageFiles.Count == 0)
+            {
+                MessageBox.Show(
+                    "No pictures found for this item. Please add pictures first using the Picture Management tab.",
+                    "AI Fill - No Pictures",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 3. Show loading state
+            btnAiFill.Enabled = false;
+            btnAiFill.Text = "AI Analyzing...";
+            this.Cursor = Cursors.WaitCursor;
+
+            try
+            {
+                using var service = new GoogleAiService(_uiState!.GoogleAiApiKey);
+                var aiResult = await service.AnalyzeImagesAsync(imageFiles);
+
+                if (aiResult == null)
+                {
+                    MessageBox.Show(
+                        "Failed to get a response from Google AI. Please check your API key and internet connection, then try again.",
+                        "AI Fill - Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    return;
+                }
+
+                // 4. Populate form fields from the AI response
+                PopulateFromAiResult(aiResult);
+
+                _logger.LogInfo($"AI Fill completed successfully. SKU: {_item.SKU}, AI Title: {aiResult.Title}");
+                MessageBox.Show(
+                    "Fields filled from AI analysis. Please review and edit as needed before saving.",
+                    "AI Fill - Complete",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("BtnAiFill_Click failed", ex);
+                MessageBox.Show(
+                    $"An error occurred during AI analysis: {ex.Message}",
+                    "AI Fill - Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                btnAiFill.Enabled = true;
+                btnAiFill.Text = "AI Fill";
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        /// <summary>
+        /// Fills the edit-form controls from the parsed <see cref="AiFillResult"/>.
+        /// Truncates Title to 80 chars to comply with the MaxLength constraint.
+        /// </summary>
+        private void PopulateFromAiResult(AiFillResult result)
+        {
+            if (!string.IsNullOrWhiteSpace(result.Title))
+            {
+                txtTitle.Text = result.Title.Length > 80
+                    ? result.Title.Substring(0, 80)
+                    : result.Title;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Description))
+                txtDescription.Text = result.Description;
+
+            if (!string.IsNullOrWhiteSpace(result.Category))
+                txtCategory.Text = result.Category;
+
+            if (!string.IsNullOrWhiteSpace(result.SubCategory))
+                txtSubCategory.Text = result.SubCategory;
+
+            if (!string.IsNullOrWhiteSpace(result.Brand))
+                txtBrand.Text = result.Brand;
+
+            if (!string.IsNullOrWhiteSpace(result.Size))
+                SetSizeValue(result.Size);
+        }
+
+        /// <summary>
+        /// Sets the size ComboBox to <paramref name="size"/> if it matches a
+        /// predefined option; otherwise selects "Custom" and populates the
+        /// custom-size textbox.
+        /// </summary>
+        private void SetSizeValue(string size)
+        {
+            if (cmbSize.Items.Contains(size))
+            {
+                cmbSize.SelectedItem = size;
+                txtCustomSize.Visible = false;
+                txtCustomSize.Enabled = false;
+                txtCustomSize.Text = string.Empty;
+            }
+            else
+            {
+                cmbSize.SelectedItem = "Custom";
+                txtCustomSize.Text = size;
+                txtCustomSize.Visible = true;
+                txtCustomSize.Enabled = true;
+            }
         }
     }
 }

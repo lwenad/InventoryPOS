@@ -19,6 +19,8 @@ namespace InventoryPOS.Models
         public string? DefaultListingPlatforms { get; set; }
         public int MaxImagesPerSku { get; set; } = 20;
         public bool ConfirmBeforeDelete { get; set; } = true;
+        // Google AI (Gemini) API key used by the "AI Fill" feature in the edit form
+        public string? GoogleAiApiKey { get; set; }
         public List<string>? HiddenColumns { get; set; }
     }
 }

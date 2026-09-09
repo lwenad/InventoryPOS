@@ -16,6 +16,8 @@ namespace InventoryPOS.Forms
         private Button btnBrowse = null!;
         private TextBox txtLogFolderPath = null!;
         private Button btnBrowseLog = null!;
+        private TextBox txtAiApiKey = null!;
+        private Button btnShowApiKey = null!;
         private CheckedListBox chkDefaultPlatforms = null!;
         private Button btnSave = null!;
         private Button btnCancel = null!;
@@ -37,7 +39,7 @@ namespace InventoryPOS.Forms
             // Form settings - Increased height to prevent overlapping
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(550, 275);
+            this.ClientSize = new Size(550, 360);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -188,11 +190,61 @@ namespace InventoryPOS.Forms
             };
             this.Controls.Add(chkConfirmDelete);
 
+            // Google AI API Key Label
+            var lblAiApiKey = new Label
+            {
+                Text = "Google AI API Key:",
+                Location = new Point(20, 260),
+                Size = new Size(110, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblAiApiKey);
+
+            // Google AI API Key TextBox (masked by default)
+            txtAiApiKey = new TextBox
+            {
+                Location = new Point(135, 258),
+                Size = new Size(245, 25),
+                PasswordChar = '*'
+            };
+            this.Controls.Add(txtAiApiKey);
+
+            // Show/Hide API Key Button
+            btnShowApiKey = new Button
+            {
+                Text = "Show",
+                Location = new Point(390, 257),
+                Size = new Size(55, 27),
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 8F)
+            };
+            btnShowApiKey.FlatAppearance.BorderSize = 1;
+            btnShowApiKey.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btnShowApiKey.Click += (s, e) =>
+            {
+                txtAiApiKey.PasswordChar = txtAiApiKey.PasswordChar == '*' ? '\0' : '*';
+                btnShowApiKey.Text = txtAiApiKey.PasswordChar == '*' ? "Show" : "Hide";
+            };
+            this.Controls.Add(btnShowApiKey);
+
+            // Help text for AI API Key
+            var lblAiHelp = new Label
+            {
+                Text = "Used by the AI Fill button to analyze item pictures via Gemini. Get a key at https://aistudio.google.com/",
+                Location = new Point(135, 286),
+                Size = new Size(395, 30),
+                ForeColor = Color.Gray,
+                Font = new Font("Segoe UI", 7.5F),
+                AutoSize = false,
+                TextAlign = ContentAlignment.TopLeft
+            };
+            this.Controls.Add(lblAiHelp);
+
             // Save Button
             btnSave = new Button
             {
                 Text = "Save",
-                Location = new Point(340, 220),
+                Location = new Point(340, 322),
                 Size = new Size(90, 35),
                 BackColor = Color.FromArgb(0, 122, 204),
                 ForeColor = Color.White,
@@ -206,7 +258,7 @@ namespace InventoryPOS.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(440, 220),
+                Location = new Point(440, 322),
                 Size = new Size(90, 35),
                 DialogResult = DialogResult.Cancel,
                 FlatStyle = FlatStyle.Flat
@@ -225,6 +277,7 @@ namespace InventoryPOS.Forms
         {
             txtPictureFolderPath.Text = _uiState.PictureFolderPath ?? string.Empty;
             txtLogFolderPath.Text = _uiState.LogFolderPath ?? string.Empty;
+            txtAiApiKey.Text = _uiState.GoogleAiApiKey ?? string.Empty;
         }
 
         private void BtnBrowse_Click(object? sender, EventArgs e)
@@ -284,6 +337,7 @@ namespace InventoryPOS.Forms
                 LastFilePath = _uiState.LastFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
                 LogFolderPath = txtLogFolderPath.Text.Trim(),
+                GoogleAiApiKey = txtAiApiKey.Text.Trim(),
                 DefaultListingPlatforms = platformsToSave,
                 MaxImagesPerSku = _uiState.MaxImagesPerSku,
                 ConfirmBeforeDelete = _uiState.ConfirmBeforeDelete,
