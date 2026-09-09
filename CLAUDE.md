@@ -34,7 +34,8 @@ InventoryPOS/                  # Root namespace
 │   ├── InventoryItem.cs       # Data model (17 properties + computed Profit property)
 │   └── UiState.cs             # Persisted UI state (sort, filter, file path, picture folder)
 ├── Services/
-│   └── InventoryRepository.cs # JSON file-based CRUD + UI state persistence
+│   ├── InventoryRepository.cs # JSON file-based CRUD + UI state persistence
+│   └── PictureService.cs     # Image thumbnail loading (JPG/PNG/GIF/WEBP via ImageSharp + System.Drawing)
 ├── Forms/
 │   ├── InventoryEditForm.cs   # Item editor (add/edit) with Picture Management tab
 │   ├── ProfitCalculatorForm.cs  # Platform-specific profit calculator (eBay/Poshmark/Depop)
@@ -76,7 +77,9 @@ InventoryPOS/                  # Root namespace
 ### Picture Management
 
 - Pictures are stored at `{PictureFolderPath}/pictures/{SKU}/` with a maximum of 20 images per SKU.
-- Supported formats: JPG, JPEG, PNG, GIF.
+- Supported formats: JPG, JPEG, PNG, GIF, WEBP. WebP decoding uses the SixLabors.ImageSharp library (System.Drawing does not natively support WebP).
+- The picture folder is configured via Configuration → Browse for folder.
+- The Picture Management tab in `InventoryEditForm` refreshes when navigated to (via `SelectedIndexChanged`), so it reflects external changes.
 - The picture folder is configured via Configuration → Browse for folder.
 - The Picture Management tab in `InventoryEditForm` refreshes when navigated to (via `SelectedIndexChanged`), so it reflects external changes.
 

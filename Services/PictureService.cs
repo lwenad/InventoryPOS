@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace InventoryPOS.Services
 {
@@ -19,7 +20,7 @@ namespace InventoryPOS.Services
         /// Supported image extensions (lowercase, including the dot).
         /// Matches the existing set used in <see cref="InventoryEditForm"/>.
         /// </summary>
-        private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".gif" };
+        private static readonly string[] ImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
         /// <summary>
         /// Maximum number of pictures per SKU (mirrors the edit-form limit).
@@ -75,9 +76,39 @@ namespace InventoryPOS.Services
         }
 
         /// <summary>
+        /// Loads an image from disk as a <see cref="Bitmap"/>. Uses ImageSharp for WebP
+        /// (which System.Drawing cannot decode) and falls back to System.Drawing for
+        /// all other supported formats.
+        /// </summary>
+        /// <param name="imagePath">Full path to the source image file.</param>
+        /// <returns>A <see cref="Bitmap"/> independent of any file or stream handles.</returns>
+        private static Bitmap LoadImageBitmap(string imagePath)
+        {
+            var ext = Path.GetExtension(imagePath).ToLowerInvariant();
+
+            if (ext == ".webp")
+            {
+                // ImageSharp decodes WebP; re-encode to PNG in a memory stream so
+                // System.Drawing can consume it.
+                using var image = SixLabors.ImageSharp.Image.Load(imagePath);
+                using var ms = new MemoryStream();
+                image.Save(ms, new PngEncoder());
+                ms.Position = 0;
+                using var temp = Image.FromStream(ms);
+                return new Bitmap(temp); // clone so the stream can be safely disposed
+            }
+
+            // Standard image formats handled by System.Drawing
+            using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var source = Image.FromStream(stream);
+            return new Bitmap(source);
+        }
+
+        /// <summary>
         /// Loads and scales an image from disk into a thumbnail bitmap.
-        /// Uses a file stream + <see cref="Image.FromStream"/> pattern to avoid
-        /// the file-locking behavior of <c>Image.FromFile</c>.
+        /// Uses ImageSharp for WebP (which System.Drawing cannot decode) and
+        /// falls back to System.Drawing for all other formats. The file stream
+        /// is opened with <c>FileShare.ReadWrite</code> to avoid locking.
         /// </summary>
         /// <param name="imagePath">Full path to the source image file.</param>
         /// <param name="size">Desired width and height of the thumbnail.</param>
@@ -89,8 +120,7 @@ namespace InventoryPOS.Services
 
             try
             {
-                using var stream = new FileStream(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var source = Image.FromStream(stream);
+                using var source = LoadImageBitmap(imagePath);
                 var thumb = new Bitmap(size, size);
                 using (var graphics = Graphics.FromImage(thumb))
                 {

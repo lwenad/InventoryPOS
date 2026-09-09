@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq; // Required for the .Cast<string>() extension
 using System.Windows.Forms;
@@ -752,6 +751,7 @@ private async void LoadPictures()
                 .Concat(Directory.GetFiles(skuFolder, "*.jpeg"))
                 .Concat(Directory.GetFiles(skuFolder, "*.png"))
                 .Concat(Directory.GetFiles(skuFolder, "*.gif"))
+                .Concat(Directory.GetFiles(skuFolder, "*.webp"))
                 .OrderBy(f => f)
                 .Take(20)
                 .ToList();
@@ -785,9 +785,14 @@ private async void LoadPictures()
                         Margin = new Padding(5)
                     };
 
-                    // Load thumbnail
-                    using var image = Image.FromFile(pictureFile);
-                    var thumbnail = GetThumbnail(image, 120, 120);
+                    // Load thumbnail (ImageService handles WebP via ImageSharp)
+                    var thumbnail = PictureService.LoadThumbnail(pictureFile, 120);
+                    if (thumbnail == null)
+                    {
+                        _logger.LogWarning($"Error loading image {pictureFile}");
+                        System.Diagnostics.Debug.WriteLine($"Error loading image {pictureFile}: failed to decode");
+                        continue;
+                    }
 
                     var picBox = new PictureBox
                     {
@@ -830,15 +835,8 @@ private async void LoadPictures()
             }
         }
 
-        private Image GetThumbnail(Image sourceImage, int width, int height)
-        {
-            var thumb = new Bitmap(width, height);
-            using (var graphics = Graphics.FromImage(thumb))
-            {
-                graphics.DrawImage(sourceImage, 0, 0, width, height);
-            }
-            return thumb;
-        }
+        // (Image loading is delegated to PictureService.LoadThumbnail which
+        //  supports WebP via ImageSharp.)
 
         private void SelectPicture(PictureBox pictureBox, string filePath)
         {
@@ -909,14 +907,14 @@ private async void LoadPictures()
             }
             else
             {
-                MessageBox.Show("Please drop only image files (JPG, PNG, GIF).", "Invalid Files", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Please drop only image files (JPG, PNG, GIF, WEBP).", "Invalid Files", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
         private bool IsImageFile(string filePath)
         {
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
-            return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif";
+            return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif" || ext == ".webp";
         }
 
         private void BtnAddPicture_Click(object? sender, EventArgs e)
@@ -924,7 +922,7 @@ private async void LoadPictures()
             using var dialog = new OpenFileDialog
             {
                 Title = "Select Images",
-                Filter = "Image Files (*.jpg;*.jpeg;*.png;*.gif)|*.jpg;*.jpeg;*.png;*.gif|All Files (*.*)|*.*",
+                Filter = "Image Files (*.jpg;*.jpeg;*.png;*.gif;*.webp)|*.jpg;*.jpeg;*.png;*.gif;*.webp|All Files (*.*)|*.*",
                 Multiselect = true
             };
 
@@ -945,7 +943,7 @@ private async void LoadPictures()
             int existingPictures = 0;
             if (Directory.Exists(skuFolder))
             {
-                existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Count();
+                existingPictures = Directory.GetFiles(skuFolder, "*.jpg").Concat(Directory.GetFiles(skuFolder, "*.jpeg")).Concat(Directory.GetFiles(skuFolder, "*.png")).Concat(Directory.GetFiles(skuFolder, "*.gif")).Concat(Directory.GetFiles(skuFolder, "*.webp")).Count();
             }
 
             if (existingPictures + imageFiles.Count > _uiState!.MaxImagesPerSku)
@@ -1207,6 +1205,7 @@ private async void LoadPictures()
                 .Concat(Directory.GetFiles(skuFolder, "*.jpeg"))
                 .Concat(Directory.GetFiles(skuFolder, "*.png"))
                 .Concat(Directory.GetFiles(skuFolder, "*.gif"))
+                .Concat(Directory.GetFiles(skuFolder, "*.webp"))
                 .OrderBy(f => f)
                 .Take(3)
                 .ToList();
