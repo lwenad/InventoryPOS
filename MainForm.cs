@@ -1614,10 +1614,46 @@ namespace InventoryPOS
 
         private void DgvInventory_CellDoubleClick(object? sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex >= 0)
+            if (e.RowIndex < 0) return;
+
+            // Double-clicking the thumbnail opens a full-size image viewer.
+            // Double-clicking anywhere else in the row edits the item. If the
+            // SKU has no pictures, fall through to editing.
+            if (e.ColumnIndex >= 0 && dgvInventory.Columns[e.ColumnIndex].Name == "Photo")
             {
-                EditSelectedItem();
+                var item = _bindingList[e.RowIndex];
+                if (OpenImageViewer(item.SKU))
+                    return;
             }
+
+            EditSelectedItem();
+        }
+
+        /// <summary>
+        /// Opens a full-size image viewer for the pictures of the given SKU.
+        /// </summary>
+        /// <param name="sku">The item SKU whose pictures to display.</param>
+        /// <returns>True if a viewer was opened; false if there were no pictures to display.</returns>
+        private bool OpenImageViewer(string? sku)
+        {
+            if (string.IsNullOrWhiteSpace(sku) || string.IsNullOrEmpty(_pictureFolderPath))
+                return false;
+
+            var imagePaths = PictureService.GetPicturePaths(_pictureFolderPath, sku);
+            if (imagePaths.Count == 0)
+                return false;
+
+            try
+            {
+                using var viewer = new ImageViewerForm(imagePaths, 0);
+                viewer.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to open image viewer for SKU '{sku}': {ex.Message}", ex);
+            }
+
+            return true;
         }
 
         private void DgvInventory_KeyDown(object? sender, KeyEventArgs e)

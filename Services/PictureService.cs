@@ -46,6 +46,38 @@ namespace InventoryPOS.Services
         }
 
         /// <summary>
+        /// Returns all supported image file paths in the SKU's picture folder,
+        /// sorted by file name so the display order is deterministic.
+        /// </summary>
+        /// <param name="pictureFolderPath">The configured root picture folder.</param>
+        /// <param name="sku">The item SKU.</param>
+        /// <returns>A list of full image paths (possibly empty) for the SKU.</returns>
+        public static List<string> GetPicturePaths(string? pictureFolderPath, string? sku)
+        {
+            var folder = GetSkuPictureFolder(pictureFolderPath, sku);
+            if (folder == null || !Directory.Exists(folder))
+                return new List<string>();
+
+            try
+            {
+                var files = Directory.GetFiles(folder)
+                    .Where(f => ImageExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    .OrderBy(f => f)
+                    .ToList();
+
+                return files;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return new List<string>();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new List<string>();
+            }
+        }
+
+        /// <summary>
         /// Returns the full path of the first image file in the SKU's picture folder.
         /// </summary>
         /// <param name="pictureFolderPath">The configured root picture folder.</param>
@@ -53,26 +85,7 @@ namespace InventoryPOS.Services
         /// <returns>The full path to the first image, or <c>null</c> if no images found.</returns>
         public static string? GetFirstPicturePath(string? pictureFolderPath, string? sku)
         {
-            var folder = GetSkuPictureFolder(pictureFolderPath, sku);
-            if (folder == null || !Directory.Exists(folder))
-                return null;
-
-            try
-            {
-                var files = Directory.GetFiles(folder)
-                    .Where(f => ImageExtensions.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
-                    .ToList();
-
-                return files.FirstOrDefault();
-            }
-            catch (DirectoryNotFoundException)
-            {
-                return null;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return null;
-            }
+            return GetPicturePaths(pictureFolderPath, sku).FirstOrDefault();
         }
 
         /// <summary>
@@ -129,6 +142,30 @@ namespace InventoryPOS.Services
                     graphics.DrawImage(source, 0, 0, size, size);
                 }
                 return thumb;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Loads a full-size image from disk, decoded at its native resolution.
+        /// Uses ImageSharp for WebP (which System.Drawing cannot decode) and
+        /// falls back to System.Drawing for all other supported formats. The
+        /// returned bitmap is independent of any file or stream handle, so the
+        /// source file is not locked after loading.
+        /// </summary>
+        /// <param name="imagePath">Full path to the source image file.</param>
+        /// <returns>A full-size <see cref="Bitmap"/>, or <c>null</c> on failure.</returns>
+        public static Image? LoadImage(string? imagePath)
+        {
+            if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+                return null;
+
+            try
+            {
+                return LoadImageBitmap(imagePath);
             }
             catch
             {
