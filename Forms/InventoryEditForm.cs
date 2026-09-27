@@ -108,7 +108,7 @@ namespace InventoryPOS.Forms
             // Form settings
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(620, 850); // Increased height so Save/Cancel buttons are visible without scrolling
+            this.ClientSize = new Size(720, 850);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -316,42 +316,80 @@ namespace InventoryPOS.Forms
             var spacing = 35;
             var y = startY;
 
+            // Group box for primary fields (SKU, Title, Description, Brand, Condition)
+            var grp = new GroupBox
+            {
+                Text = "Item",
+                Location = new Point(10, y),
+                Size = new Size(530, 205)
+            };
+
+            // SKU
+            var lblSku = new Label { Text = "SKU", Location = new Point(10, 22), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft };
+            txtSKU = new TextBox { Location = new Point(110, 20), Size = new Size(400, 25) };
+            grp.Controls.AddRange(new Control[] { lblSku, txtSKU });
+
             // Title
-            AddLabel("Title *", 20, y, labelWidth);
-            txtTitle = AddTextBox(130, y, controlWidth);
-            txtTitle.MaxLength = 80;
-            var lblTitleCount = AddLabel("0/80", 490, y, 50);
-            lblTitleCount.ForeColor = Color.Gray;
+            var lblTitle = new Label { Text = "Title *", Location = new Point(10, 52), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft };
+            txtTitle = new TextBox { Location = new Point(110, 50), Size = new Size(310, 25), MaxLength = 80 };
+            var lblTitleCount = new Label { Text = "0/80", Location = new Point(430, 50), Size = new Size(80, 20), ForeColor = Color.Gray, TextAlign = ContentAlignment.MiddleLeft };
             txtTitle.TextChanged += (s, e) => lblTitleCount.Text = $"{txtTitle.Text.Length}/80";
-            y += spacing;
+            grp.Controls.AddRange(new Control[] { lblTitle, txtTitle, lblTitleCount });
 
             // Description
-            AddLabel("Description", 20, y, labelWidth);
-            txtDescription = AddTextBox(130, y, controlWidth, 60);
-            txtDescription.Multiline = true;
-            txtDescription.ScrollBars = ScrollBars.Vertical;
-            y += spacing + 30;
+            var lblDesc = new Label { Text = "Description", Location = new Point(10, 82), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft };
+            txtDescription = new TextBox { Location = new Point(110, 80), Size = new Size(400, 50), Multiline = true, ScrollBars = ScrollBars.Vertical };
+            grp.Controls.AddRange(new Control[] { lblDesc, txtDescription });
 
-            // Category
-            AddLabel("Category", 20, y, labelWidth);
-            txtCategory = AddTextBox(130, y, controlWidth);
-            y += spacing;
+            // Brand
+            var lblBrand = new Label { Text = "Brand", Location = new Point(10, 138), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft };
+            txtBrand = new TextBox { Location = new Point(110, 136), Size = new Size(400, 25) };
+            grp.Controls.AddRange(new Control[] { lblBrand, txtBrand });
 
-            // Sub Category
-            AddLabel("Sub Category", 20, y, labelWidth);
-            txtSubCategory = AddTextBox(130, y, controlWidth);
-            y += spacing;
+            // Condition
+            var lblCond = new Label { Text = "Condition", Location = new Point(10, 168), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft };
+            cmbCondition = new ComboBox { Location = new Point(110, 166), Size = new Size(400, 25), DropDownStyle = ComboBoxStyle.DropDownList };
+            cmbCondition.Items.AddRange(new[] { "New with tags (NWT)", "Pre-owned - Excellent", "Pre-owned - Good", "Pre-owned - Fair" });
+            grp.Controls.AddRange(new Control[] { lblCond, cmbCondition });
 
-            // Quantity
-            AddLabel("Quantity", 20, y, labelWidth);
-            numQuantity = AddNumericUpDown(130, y, 100, 0, 999999);
-            y += spacing;
+            mainPanel.Controls.Add(grp);
+            y += grp.Height + 15;
 
-            // Size (predefined list with Custom option)
-            AddLabel("Size", 20, y, labelWidth);
+            // Category group
+            var categoryGroup = new GroupBox
+            {
+                Text = "Category",
+                Location = new Point(10, y),
+                Size = new Size(530, 90)
+            };
+            categoryGroup.Controls.AddRange(new Control[]
+            {
+                new Label { Text = "Category", Location = new Point(10, 22), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "Sub Category", Location = new Point(10, 52), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft }
+            });
+            txtCategory = new TextBox { Location = new Point(110, 20), Size = new Size(400, 25) };
+            txtSubCategory = new TextBox { Location = new Point(110, 50), Size = new Size(400, 25) };
+            categoryGroup.Controls.AddRange(new Control[] { txtCategory, txtSubCategory });
+            mainPanel.Controls.Add(categoryGroup);
+            y += categoryGroup.Height + 10;
+
+            // Quantity, size, and colors group
+            var detailsGroup = new GroupBox
+            {
+                Text = "Details",
+                Location = new Point(10, y),
+                Size = new Size(530, 120)
+            };
+            detailsGroup.Controls.AddRange(new Control[]
+            {
+                new Label { Text = "Quantity", Location = new Point(10, 22), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "Size", Location = new Point(10, 52), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "Colors", Location = new Point(10, 82), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft }
+            });
+            numQuantity = new NumericUpDown { Location = new Point(110, 20), Size = new Size(100, 25), Minimum = 0, Maximum = 999999, ThousandsSeparator = true };
             cmbSize = new ComboBox
             {
-                Location = new Point(130, y),
+                Location = new Point(110, 50),
                 Size = new Size(200, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
@@ -364,75 +402,37 @@ namespace InventoryPOS.Forms
                 if (isCustom)
                     txtCustomSize.Focus();
             };
-            mainPanel.Controls.Add(cmbSize);
+            txtCustomSize = new TextBox { Location = new Point(320, 50), Size = new Size(190, 25), Visible = false, Enabled = false };
+            txtColors = new TextBox { Location = new Point(110, 80), Size = new Size(400, 25) };
+            detailsGroup.Controls.AddRange(new Control[] { numQuantity, cmbSize, txtCustomSize, txtColors });
+            mainPanel.Controls.Add(detailsGroup);
+            y += detailsGroup.Height + 10;
 
-            // Custom size textbox (hidden by default)
-            txtCustomSize = AddTextBox(340, y, controlWidth - 210);
-            txtCustomSize.Visible = false;
-            txtCustomSize.Enabled = false;
-            y += spacing;
-
-            // Condition
-            AddLabel("Condition", 20, y, labelWidth);
-            cmbCondition = new ComboBox
+            // Pricing group
+            var pricingGroup = new GroupBox
             {
-                Location = new Point(130, y),
-                Size = new Size(controlWidth, 25),
-                DropDownStyle = ComboBoxStyle.DropDownList
+                Text = "Pricing",
+                Location = new Point(10, y),
+                Size = new Size(530, 150)
             };
-            cmbCondition.Items.AddRange(new[]
+            pricingGroup.Controls.AddRange(new Control[]
             {
-    "New with tags (NWT)",
-    "Pre-owned - Excellent",
-    "Pre-owned - Good",
-    "Pre-owned - Fair"
-});
-            mainPanel.Controls.Add(cmbCondition);
-            y += spacing;
-
-            // (Status control moved below Earnings)
-
-            // Brand
-            AddLabel("Brand", 20, y, labelWidth);
-            txtBrand = AddTextBox(130, y, controlWidth);
-            y += spacing;
-
-            // Colors
-            AddLabel("Colors", 20, y, labelWidth);
-            txtColors = AddTextBox(130, y, controlWidth);
-            y += spacing;
-
-            // Listing Price
-            AddLabel("Listing Price", 20, y, labelWidth);
-            numListingPrice = AddNumericUpDown(130, y, 150, 0, 999999, 2);
-            y += spacing;
-
-            // COG
-            AddLabel("COG", 20, y, labelWidth);
-            numCOG = AddNumericUpDown(130, y, 150, 0, 999999, 2);
-            y += spacing;
-
-            // Sold Price
-            AddLabel("Sold Price", 20, y, labelWidth);
-            var tempSold = AddNumericUpDown(130, y, 150, 0, 999999, 2);
-            // keep a named field reference
-            numSoldPrice = tempSold;
-            numSoldPrice.DecimalPlaces = 2;
-            numSoldPrice.Enabled = false; // default disabled until Status == Sold
-            mainPanel.Controls.Add(numSoldPrice);
-            y += spacing;
-
-            // Earnings (revenue)
-            AddLabel("Earnings", 20, y, labelWidth);
-            var tempEarnings = AddNumericUpDown(130, y, 150, 0, 999999, 2);
-            numEarnings = tempEarnings;
-            numEarnings.DecimalPlaces = 2;
-            numEarnings.Enabled = false; // enabled when Status == Sold
-            mainPanel.Controls.Add(numEarnings);
-            y += spacing;
+                new Label { Text = "Listing Price", Location = new Point(10, 22), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "COG", Location = new Point(10, 52), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "Sold Price", Location = new Point(10, 82), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft },
+                new Label { Text = "Earnings", Location = new Point(10, 112), Size = new Size(90, 20), TextAlign = ContentAlignment.MiddleLeft }
+            });
+            numListingPrice = new NumericUpDown { Location = new Point(110, 20), Size = new Size(150, 25), Minimum = 0, Maximum = 999999, DecimalPlaces = 2, ThousandsSeparator = true };
+            numCOG = new NumericUpDown { Location = new Point(110, 50), Size = new Size(150, 25), Minimum = 0, Maximum = 999999, DecimalPlaces = 2, ThousandsSeparator = true };
+            numSoldPrice = new NumericUpDown { Location = new Point(110, 80), Size = new Size(150, 25), Minimum = 0, Maximum = 999999, DecimalPlaces = 2, ThousandsSeparator = true, Enabled = false };
+            numEarnings = new NumericUpDown { Location = new Point(110, 110), Size = new Size(150, 25), Minimum = 0, Maximum = 999999, DecimalPlaces = 2, ThousandsSeparator = true, Enabled = false };
+            pricingGroup.Controls.AddRange(new Control[] { numListingPrice, numCOG, numSoldPrice, numEarnings });
+            mainPanel.Controls.Add(pricingGroup);
+            y += pricingGroup.Height + 10;
 
             // Status (moved here so it appears after Earnings)
-            AddLabel("Status", 20, y, labelWidth);
+            var lblStatus = AddLabel("Status", 20, y, labelWidth);
+            lblStatus.Font = new Font(lblStatus.Font, FontStyle.Bold);
             cmbStatus = new ComboBox
             {
                 Location = new Point(130, y),
@@ -458,10 +458,7 @@ namespace InventoryPOS.Forms
             mainPanel.Controls.Add(dtSoldDate);
             y += spacing;
 
-            // SKU
-            AddLabel("SKU", 20, y, labelWidth);
-            txtSKU = AddTextBox(130, y, controlWidth);
-            y += spacing;
+            // SKU was moved into the top group box
 
             // Platform (Updated UI)
             AddLabel("Listing Platform", 20, y, labelWidth);
@@ -476,14 +473,14 @@ namespace InventoryPOS.Forms
             chkPlatform.Items.AddRange(new string[] { "eBay", "Poshmark", "Depop" });
             mainPanel.Controls.Add(chkPlatform);
 
-            y += 80;
+            y += 70;
 
             // AI Fill Button
             btnAiFill = new Button
             {
                 Text = "AI Fill",
                 Location = new Point(130, y),
-                Size = new Size(140, 35),
+                Size = new Size(110, 35),
                 BackColor = Color.FromArgb(106, 36, 255),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -497,8 +494,8 @@ namespace InventoryPOS.Forms
             btnSave = new Button
             {
                 Text = "Save",
-                Location = new Point(280, y),
-                Size = new Size(90, 35),
+                Location = new Point(250, y),
+                Size = new Size(110, 35),
                 BackColor = Color.FromArgb(0, 122, 204),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat
@@ -510,8 +507,8 @@ namespace InventoryPOS.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(380, y),
-                Size = new Size(90, 35),
+                Location = new Point(370, y),
+                Size = new Size(110, 35),
                 DialogResult = DialogResult.Cancel,
                 FlatStyle = FlatStyle.Flat
             };
