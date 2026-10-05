@@ -276,7 +276,7 @@ namespace InventoryPOS.Forms
         private void LoadCurrentSettings()
         {
             txtPictureFolderPath.Text = _uiState.PictureFolderPath ?? string.Empty;
-            txtLogFolderPath.Text = _uiState.LogFolderPath ?? string.Empty;
+            txtLogFolderPath.Text = LoggerService.NormalizeLogFolderPath(_uiState.LogFolderPath) ?? string.Empty;
             txtAiApiKey.Text = _uiState.GoogleAiApiKey ?? string.Empty;
         }
 
@@ -303,8 +303,8 @@ namespace InventoryPOS.Forms
             {
                 Description = "Select the folder for storing log files",
                 ShowNewFolderButton = true,
-                SelectedPath = !string.IsNullOrEmpty(_uiState.LogFolderPath) && Directory.Exists(_uiState.LogFolderPath)
-                    ? _uiState.LogFolderPath
+                SelectedPath = !string.IsNullOrEmpty(txtLogFolderPath.Text) && Directory.Exists(txtLogFolderPath.Text)
+                    ? txtLogFolderPath.Text
                     : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
             };
 
@@ -336,7 +336,7 @@ namespace InventoryPOS.Forms
                 FilterValue = _uiState.FilterValue,
                 LastFilePath = _uiState.LastFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
-                LogFolderPath = txtLogFolderPath.Text.Trim(),
+                LogFolderPath = LoggerService.NormalizeLogFolderPath(txtLogFolderPath.Text),
                 GoogleAiApiKey = txtAiApiKey.Text.Trim(),
                 DefaultListingPlatforms = platformsToSave,
                 MaxImagesPerSku = _uiState.MaxImagesPerSku,

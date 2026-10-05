@@ -210,14 +210,28 @@ namespace InventoryPOS.Services
         {
             if (uiState != null && !string.IsNullOrWhiteSpace(uiState.LogFolderPath))
             {
-                CustomLogFolderPath = uiState.LogFolderPath;
-                Instance.ApplyCustomLogFolder(uiState.LogFolderPath);
+                var logFolderPath = NormalizeLogFolderPath(uiState.LogFolderPath);
+                CustomLogFolderPath = logFolderPath;
+                Instance.ApplyCustomLogFolder(logFolderPath);
             }
             else
             {
                 CustomLogFolderPath = null;
                 Instance.ApplyCustomLogFolder(null);
             }
+        }
+
+        public static string? NormalizeLogFolderPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return path;
+            }
+
+            path = path.Trim();
+            return string.Equals(Path.GetExtension(path), ".log", StringComparison.OrdinalIgnoreCase)
+                ? Path.GetDirectoryName(path) ?? path
+                : path;
         }
 
         /// <summary>
