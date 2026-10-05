@@ -44,6 +44,8 @@ namespace InventoryPOS
         private ToolStripStatusLabel lblCount = null!;
         private List<InventoryItem> _allItems = new();
         private ToolStripStatusLabel lblTotalCOG = null!;
+        private ToolStripStatusLabel lblCreatedCOG = null!;
+        private ToolStripStatusLabel lblSoldCOG = null!;
         private ToolStripStatusLabel lblTotalProfit = null!;
         private ToolStripStatusLabel lblTotalEarnings = null!;
         private Color _headerBackColor = Color.FromArgb(240, 240, 240);
@@ -1175,6 +1177,20 @@ namespace InventoryPOS
                 BorderStyle = Border3DStyle.Etched
             };
 
+            lblCreatedCOG = new ToolStripStatusLabel("Created COG: $0.00 (0.00%)")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
+            lblSoldCOG = new ToolStripStatusLabel("Sold COG: $0.00 (0.00%)")
+            {
+                TextAlign = ContentAlignment.MiddleRight,
+                BorderSides = ToolStripStatusLabelBorderSides.Left,
+                BorderStyle = Border3DStyle.Etched
+            };
+
             lblTotalProfit = new ToolStripStatusLabel("Total Profit: $0.00")
             {
                 TextAlign = ContentAlignment.MiddleRight,
@@ -1209,7 +1225,7 @@ namespace InventoryPOS
                 BorderStyle = Border3DStyle.Etched
             };
 
-            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCreatedCount, lblSoldCount, lblCount, lblTotalCOG, lblTotalEarnings, lblTotalProfit  });
+            statusStrip.Items.AddRange(new ToolStripItem[] { lblStatus, lblFilterIndicator, lblCreatedCount, lblSoldCount, lblCount, lblTotalCOG, lblCreatedCOG, lblSoldCOG, lblTotalEarnings, lblTotalProfit });
             this.Controls.Add(statusStrip);
         }
 
@@ -1460,6 +1476,10 @@ namespace InventoryPOS
             lblCreatedCount.Text = $"Created: {createdCount}";
             decimal totalCOG = items.Sum(i => i.COG);
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
+            decimal createdCOG = items.Where(i => string.Equals(i.Status, "Created", StringComparison.OrdinalIgnoreCase)).Sum(i => i.COG);
+            decimal soldCOG = items.Where(i => string.Equals(i.Status, "Sold", StringComparison.OrdinalIgnoreCase)).Sum(i => i.COG);
+            lblCreatedCOG.Text = $"Created COG: {createdCOG:C2} ({(totalCOG == 0m ? 0m : createdCOG / totalCOG * 100m):F2}%)";
+            lblSoldCOG.Text = $"Sold COG: {soldCOG:C2} ({(totalCOG == 0m ? 0m : soldCOG / totalCOG * 100m):F2}%)";
             decimal totalProfit = items.Sum(i => i.Profit);
             lblTotalProfit.Text = $"Total Profit: {totalProfit:C2}";
             decimal totalEarnings = items.Sum(i => i.Earnings);
@@ -1475,6 +1495,10 @@ namespace InventoryPOS
             lblCreatedCount.Text = $"Created: {createdCount}";
             decimal totalCOG = items.Sum(i => i.COG);
             lblTotalCOG.Text = $"Total COG: {totalCOG:C2}";
+            decimal createdCOG = items.Where(i => string.Equals(i.Status, "Created", StringComparison.OrdinalIgnoreCase)).Sum(i => i.COG);
+            decimal soldCOG = items.Where(i => string.Equals(i.Status, "Sold", StringComparison.OrdinalIgnoreCase)).Sum(i => i.COG);
+            lblCreatedCOG.Text = $"Created COG: {createdCOG:C2} ({(totalCOG == 0m ? 0m : createdCOG / totalCOG * 100m):F2}%)";
+            lblSoldCOG.Text = $"Sold COG: {soldCOG:C2} ({(totalCOG == 0m ? 0m : soldCOG / totalCOG * 100m):F2}%)";
             decimal totalProfit = items.Sum(i => i.Profit);
             lblTotalProfit.Text = $"Total Profit: {totalProfit:C2}";
             decimal totalEarnings = items.Sum(i => i.Earnings);
