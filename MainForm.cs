@@ -29,6 +29,7 @@ namespace InventoryPOS
         private ToolStripMenuItem menuFileExit = null!;
         private ToolStripMenuItem menuConfiguration = null!;
         private ToolStripMenuItem menuProfitCalculator = null!;
+        private ToolStripMenuItem menuClosetInsight = null!;
         private ToolStripMenuItem menuView = null!;
         private ToolStripMenuItem menuColumns = null!;
         private HashSet<string> _hiddenColumns = new();
@@ -155,6 +156,12 @@ namespace InventoryPOS
                 ToolTipText = "Open profit calculator for eBay, Poshmark, and Depop"
             };
             menuStrip.Items.Add(menuProfitCalculator);
+
+            menuClosetInsight = new ToolStripMenuItem("Closet Insight", null, MenuClosetInsight_Click)
+            {
+                ToolTipText = "View sales, earnings, and listings sold over time"
+            };
+            menuStrip.Items.Add(menuClosetInsight);
 
             // Marketplace menu
             var menuMarketplace = new ToolStripMenuItem("&Marketplace");
@@ -314,6 +321,12 @@ namespace InventoryPOS
         private void MenuProfitCalculator_Click(object? sender, EventArgs e)
         {
             using var form = new ProfitCalculatorForm();
+            form.ShowDialog(this);
+        }
+
+        private void MenuClosetInsight_Click(object? sender, EventArgs e)
+        {
+            using var form = new ClosetInsightForm(_allItems);
             form.ShowDialog(this);
         }
 
