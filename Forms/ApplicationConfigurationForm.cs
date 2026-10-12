@@ -19,6 +19,9 @@ namespace InventoryPOS.Forms
         private TextBox txtAiApiKey = null!;
         private Button btnShowApiKey = null!;
         private CheckedListBox chkDefaultPlatforms = null!;
+        private TextBox txtCustomMarketplaceName = null!;
+        private TextBox txtCustomMarketplaceUrl = null!;
+        private ListBox lstCustomMarketplaces = null!;
         private Button btnSave = null!;
         private Button btnCancel = null!;
 
@@ -39,7 +42,7 @@ namespace InventoryPOS.Forms
             // Form settings - Increased height to prevent overlapping
             this.AutoScaleDimensions = new SizeF(8F, 16F);
             this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(550, 360);
+            this.ClientSize = new Size(950, 405);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -240,11 +243,78 @@ namespace InventoryPOS.Forms
             };
             this.Controls.Add(lblAiHelp);
 
+            var groupCustomMarketplaces = new GroupBox
+            {
+                Text = "Custom Marketplaces",
+                Location = new Point(550, 18),
+                Size = new Size(380, 315)
+            };
+            this.Controls.Add(groupCustomMarketplaces);
+
+            groupCustomMarketplaces.Controls.Add(new Label
+            {
+                Text = "Name:",
+                Location = new Point(15, 30),
+                Size = new Size(70, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            txtCustomMarketplaceName = new TextBox
+            {
+                Location = new Point(90, 28),
+                Size = new Size(270, 25)
+            };
+            groupCustomMarketplaces.Controls.Add(txtCustomMarketplaceName);
+
+            groupCustomMarketplaces.Controls.Add(new Label
+            {
+                Text = "URL:",
+                Location = new Point(15, 63),
+                Size = new Size(70, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            txtCustomMarketplaceUrl = new TextBox
+            {
+                Location = new Point(90, 61),
+                Size = new Size(270, 25)
+            };
+            groupCustomMarketplaces.Controls.Add(txtCustomMarketplaceUrl);
+
+            var btnAddMarketplace = new Button
+            {
+                Text = "Add",
+                Location = new Point(260, 94),
+                Size = new Size(100, 27)
+            };
+            btnAddMarketplace.Click += BtnAddMarketplace_Click;
+            groupCustomMarketplaces.Controls.Add(btnAddMarketplace);
+
+            lstCustomMarketplaces = new ListBox
+            {
+                Location = new Point(15, 130),
+                Size = new Size(345, 140)
+            };
+            groupCustomMarketplaces.Controls.Add(lstCustomMarketplaces);
+
+            var btnRemoveMarketplace = new Button
+            {
+                Text = "Remove Selected",
+                Location = new Point(15, 280),
+                Size = new Size(130, 27)
+            };
+            btnRemoveMarketplace.Click += (s, e) =>
+            {
+                if (lstCustomMarketplaces.SelectedIndex >= 0)
+                {
+                    lstCustomMarketplaces.Items.RemoveAt(lstCustomMarketplaces.SelectedIndex);
+                }
+            };
+            groupCustomMarketplaces.Controls.Add(btnRemoveMarketplace);
+
             // Save Button
             btnSave = new Button
             {
                 Text = "Save",
-                Location = new Point(340, 322),
+                Location = new Point(740, 350),
                 Size = new Size(90, 35),
                 BackColor = Color.FromArgb(0, 122, 204),
                 ForeColor = Color.White,
@@ -258,7 +328,7 @@ namespace InventoryPOS.Forms
             btnCancel = new Button
             {
                 Text = "Cancel",
-                Location = new Point(440, 322),
+                Location = new Point(840, 350),
                 Size = new Size(90, 35),
                 DialogResult = DialogResult.Cancel,
                 FlatStyle = FlatStyle.Flat
@@ -278,6 +348,43 @@ namespace InventoryPOS.Forms
             txtPictureFolderPath.Text = _uiState.PictureFolderPath ?? string.Empty;
             txtLogFolderPath.Text = LoggerService.NormalizeLogFolderPath(_uiState.LogFolderPath) ?? string.Empty;
             txtAiApiKey.Text = _uiState.GoogleAiApiKey ?? string.Empty;
+            foreach (var marketplace in _uiState.CustomMarketplaces ?? new List<CustomMarketplace>())
+            {
+                lstCustomMarketplaces.Items.Add(new CustomMarketplace
+                {
+                    Name = marketplace.Name,
+                    Url = marketplace.Url
+                });
+            }
+        }
+
+        private void BtnAddMarketplace_Click(object? sender, EventArgs e)
+        {
+            var name = txtCustomMarketplaceName.Text.Trim();
+            var urlText = txtCustomMarketplaceUrl.Text.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                MessageBox.Show("Enter a marketplace name.", "Marketplace Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCustomMarketplaceName.Focus();
+                return;
+            }
+
+            if (!Uri.TryCreate(urlText, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                MessageBox.Show("Enter a valid URL starting with http:// or https://.", "Invalid URL", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtCustomMarketplaceUrl.Focus();
+                return;
+            }
+
+            lstCustomMarketplaces.Items.Add(new CustomMarketplace
+            {
+                Name = name,
+                Url = uri.AbsoluteUri
+            });
+            txtCustomMarketplaceName.Clear();
+            txtCustomMarketplaceUrl.Clear();
+            txtCustomMarketplaceName.Focus();
         }
 
         private void BtnBrowse_Click(object? sender, EventArgs e)
@@ -341,7 +448,11 @@ namespace InventoryPOS.Forms
                 DefaultListingPlatforms = platformsToSave,
                 MaxImagesPerSku = _uiState.MaxImagesPerSku,
                 ConfirmBeforeDelete = _uiState.ConfirmBeforeDelete,
-                HiddenColumns = _uiState.HiddenColumns
+                HiddenColumns = _uiState.HiddenColumns,
+                CustomMarketplaces = lstCustomMarketplaces.Items
+                    .Cast<CustomMarketplace>()
+                    .Select(marketplace => new CustomMarketplace { Name = marketplace.Name, Url = marketplace.Url })
+                    .ToList()
             };
 
             _onSave(updatedState);

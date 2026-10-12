@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\InventoryPOS.ico</ApplicationIcon>
     <AssemblyTitle>InventoryPOS</AssemblyTitle>
     <AssemblyDescription>Clothing inventory management for resale</AssemblyDescription>
     <AssemblyProduct>InventoryPOS</AssemblyProduct>

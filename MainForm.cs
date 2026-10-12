@@ -30,6 +30,7 @@ namespace InventoryPOS
         private ToolStripMenuItem menuConfiguration = null!;
         private ToolStripMenuItem menuProfitCalculator = null!;
         private ToolStripMenuItem menuClosetInsight = null!;
+        private ToolStripMenuItem menuMarketplace = null!;
         private ToolStripMenuItem menuView = null!;
         private ToolStripMenuItem menuColumns = null!;
         private HashSet<string> _hiddenColumns = new();
@@ -63,6 +64,7 @@ namespace InventoryPOS
         private Dictionary<string, string> _originalHeaderTexts = new();
         private string? _pictureFolderPath;
         private readonly Dictionary<string, Image?> _photoCache = new(StringComparer.OrdinalIgnoreCase);
+        private List<CustomMarketplace> _customMarketplaces = new();
 
         public MainForm()
         {
@@ -83,6 +85,7 @@ namespace InventoryPOS
             this.AutoScaleMode = AutoScaleMode.Font;
             this.ClientSize = new Size(1200, 800);
             this.Name = "MainForm";
+            this.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? System.Drawing.SystemIcons.Application;
             this.Text = $"InventoryPOS v{VersionHelper.AppVersion} - Clothing Inventory for Resale";
             this.StartPosition = FormStartPosition.CenterScreen;
             // Start maximized to use full screen on startup
@@ -164,26 +167,9 @@ namespace InventoryPOS
             menuStrip.Items.Add(menuClosetInsight);
 
             // Marketplace menu
-            var menuMarketplace = new ToolStripMenuItem("&Marketplace");
-            var menuMarketplacePoshmark = new ToolStripMenuItem("&Poshmark", null, (s, e) => OpenMarketplaceUrl("https://poshmark.com"))
-            {
-                ToolTipText = "Open Poshmark website"
-            };
-            var menuMarketplaceEbay = new ToolStripMenuItem("&eBay", null, (s, e) => OpenMarketplaceUrl("https://ebay.com"))
-            {
-                ToolTipText = "Open eBay website"
-            };
-            var menuMarketplaceDepop = new ToolStripMenuItem("&Depop", null, (s, e) => OpenMarketplaceUrl("https://depop.com"))
-            {
-                ToolTipText = "Open Depop website"
-            };
-            menuMarketplace.DropDownItems.AddRange(new ToolStripItem[]
-            {
-                menuMarketplacePoshmark,
-                menuMarketplaceEbay,
-                menuMarketplaceDepop
-            });
+            menuMarketplace = new ToolStripMenuItem("&Marketplace");
             menuStrip.Items.Add(menuMarketplace);
+            RefreshMarketplaceMenu();
 
             menuView = new ToolStripMenuItem("&View");
             menuColumns = new ToolStripMenuItem("C&olumns")
@@ -205,6 +191,20 @@ namespace InventoryPOS
 
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
+        }
+
+        private void RefreshMarketplaceMenu()
+        {
+            menuMarketplace.DropDownItems.Clear();
+            foreach (var marketplace in _customMarketplaces)
+            {
+                var name = marketplace.Name.Replace("&", "&&");
+                var url = marketplace.Url;
+                menuMarketplace.DropDownItems.Add(new ToolStripMenuItem(name, null, (s, e) => OpenMarketplaceUrl(url))
+                {
+                    ToolTipText = $"Open {marketplace.Name} website"
+                });
+            }
         }
 
         private void MenuFileLoad_Click(object? sender, EventArgs e)
@@ -374,6 +374,7 @@ namespace InventoryPOS
                 currentUiState.ConfirmBeforeDelete = savedUiState.ConfirmBeforeDelete;
                 currentUiState.LogFolderPath = savedUiState.LogFolderPath;
                 currentUiState.PictureFolderPath = savedUiState.PictureFolderPath;
+                currentUiState.CustomMarketplaces = savedUiState.CustomMarketplaces;
             }
             _logger.LogInfo($"MainForm passing to config form DefaultListingPlatforms: '{currentUiState.DefaultListingPlatforms}'");
 
@@ -384,6 +385,8 @@ namespace InventoryPOS
         private async void OnConfigurationSaved(UiState updatedState)
         {
             await _repository.SaveUiStateAsync(updatedState);
+            _customMarketplaces = updatedState.CustomMarketplaces ?? new List<CustomMarketplace>();
+            RefreshMarketplaceMenu();
             // Update the cached picture folder path and invalidate the thumbnail cache
             _pictureFolderPath = updatedState.PictureFolderPath;
             _photoCache.Clear();
@@ -1153,7 +1156,10 @@ namespace InventoryPOS
                     null, // TODO: could store last platform selection if desired
                 MaxImagesPerSku = 20, // default, will be overridden by config
                 ConfirmBeforeDelete = true, // default, will be overridden by config
-                HiddenColumns = _hiddenColumns.Count > 0 ? _hiddenColumns.ToList() : null
+                HiddenColumns = _hiddenColumns.Count > 0 ? _hiddenColumns.ToList() : null,
+                CustomMarketplaces = _customMarketplaces
+                    .Select(marketplace => new CustomMarketplace { Name = marketplace.Name, Url = marketplace.Url })
+                    .ToList()
             };
         }
 
@@ -1263,6 +1269,8 @@ namespace InventoryPOS
 
                 // Load UI state first so we can restore the last used data file path before loading data
                 var ui = await _repository.LoadUiStateAsync();
+                _customMarketplaces = ui?.CustomMarketplaces ?? new List<CustomMarketplace>();
+                RefreshMarketplaceMenu();
                 // Capture the picture folder path for the photo grid column
                 if (ui?.PictureFolderPath != null)
                     _pictureFolderPath = ui.PictureFolderPath;

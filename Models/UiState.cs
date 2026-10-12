@@ -22,5 +22,6 @@ namespace InventoryPOS.Models
         // Google AI (Gemini) API key used by the "AI Fill" feature in the edit form
         public string? GoogleAiApiKey { get; set; }
         public List<string>? HiddenColumns { get; set; }
+        public List<CustomMarketplace>? CustomMarketplaces { get; set; }
     }
 }
