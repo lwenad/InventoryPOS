@@ -470,7 +470,7 @@ namespace InventoryPOS.Forms
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            chkPlatform.Items.AddRange(new string[] { "eBay", "Poshmark", "Depop" });
+            chkPlatform.Items.AddRange(new string[] { "eBay", "Poshmark", "Depop", "Vinted" });
             mainPanel.Controls.Add(chkPlatform);
 
             y += 70;

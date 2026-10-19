@@ -133,7 +133,7 @@ namespace InventoryPOS.Forms
             {
                 Location = new Point(190, 108),
                 Size = new Size(150, 75),
-                Items = { "eBay", "Poshmark", "Depop" }
+                Items = { "eBay", "Poshmark", "Depop", "Vinted" }
             };
 
             // Pre-select platforms that are in the saved default
