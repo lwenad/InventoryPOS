@@ -223,7 +223,7 @@ namespace InventoryPOS
             }
         }
 
-        private async Task LoadFromFileAsync(string filePath)
+        private async Task LoadFromFileAsync(string filePath, bool persistUiState = true)
         {
             try
             {
@@ -236,8 +236,11 @@ namespace InventoryPOS
                 lblStatus.Text = $"Loaded {_allItems.Count} items from {Path.GetFileName(filePath)}";
                 this.Text = $"InventoryPOS - {Path.GetFileName(filePath)}";
                 // persist last opened file path to UI state
-                var ui = BuildCurrentState();
-                _ = _repository.SaveUiStateAsync(ui);
+                if (persistUiState)
+                {
+                    var ui = BuildCurrentState();
+                    _ = _repository.SaveUiStateAsync(ui);
+                }
                 _logger.LogInfo($"Successfully loaded {_allItems.Count} items from {filePath}");
             }
             catch (Exception ex)
@@ -384,6 +387,10 @@ namespace InventoryPOS
 
         private async void OnConfigurationSaved(UiState updatedState)
         {
+            var inventoryPathChanged = !string.Equals(
+                _repository.CurrentFilePath,
+                updatedState.LastFilePath,
+                StringComparison.OrdinalIgnoreCase);
             await _repository.SaveUiStateAsync(updatedState);
             _customMarketplaces = updatedState.CustomMarketplaces ?? new List<CustomMarketplace>();
             RefreshMarketplaceMenu();
@@ -394,7 +401,15 @@ namespace InventoryPOS
             // Update the logger with any custom log folder path
             LoggerService.InitializeFromUiState(updatedState);
 
-            lblStatus.Text = "Configuration saved";
+            if (inventoryPathChanged && !string.IsNullOrWhiteSpace(updatedState.LastFilePath))
+            {
+                await LoadFromFileAsync(updatedState.LastFilePath, persistUiState: false);
+            }
+
+            else
+            {
+                lblStatus.Text = "Configuration saved";
+            }
         }
 
         private void CreateToolStrip()
@@ -1275,7 +1290,7 @@ namespace InventoryPOS
                 if (ui?.PictureFolderPath != null)
                     _pictureFolderPath = ui.PictureFolderPath;
 
-                if (ui != null && !string.IsNullOrEmpty(ui.LastFilePath) && System.IO.File.Exists(ui.LastFilePath))
+                if (ui != null && !string.IsNullOrEmpty(ui.LastFilePath))
                 {
                     _repository.SetFilePath(ui.LastFilePath);
                 }

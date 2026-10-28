@@ -16,6 +16,8 @@ namespace InventoryPOS.Forms
         private Button btnBrowse = null!;
         private TextBox txtLogFolderPath = null!;
         private Button btnBrowseLog = null!;
+        private TextBox txtInventoryFilePath = null!;
+        private Button btnBrowseInventory = null!;
         private TextBox txtAiApiKey = null!;
         private Button btnShowApiKey = null!;
         private CheckedListBox chkDefaultPlatforms = null!;
@@ -118,11 +120,36 @@ namespace InventoryPOS.Forms
             btnBrowseLog.Click += BtnBrowseLog_Click;
             this.Controls.Add(btnBrowseLog);
 
+            var lblInventoryFile = new Label
+            {
+                Text = "Inventory JSON:",
+                Location = new Point(20, 110),
+                Size = new Size(110, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            this.Controls.Add(lblInventoryFile);
+
+            txtInventoryFilePath = new TextBox
+            {
+                Location = new Point(135, 108),
+                Size = new Size(295, 25)
+            };
+            this.Controls.Add(txtInventoryFilePath);
+
+            btnBrowseInventory = new Button
+            {
+                Text = "Browse...",
+                Location = new Point(440, 107),
+                Size = new Size(90, 27)
+            };
+            btnBrowseInventory.Click += BtnBrowseInventory_Click;
+            this.Controls.Add(btnBrowseInventory);
+
             // Default Listing Platforms Label
             var lblDefaultPlatform = new Label
             {
                 Text = "Default Listing Platforms:",
-                Location = new Point(20, 110),
+                Location = new Point(20, 150),
                 Size = new Size(160, 20),
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -131,7 +158,7 @@ namespace InventoryPOS.Forms
             // Default Listing Platforms CheckedListBox
             chkDefaultPlatforms = new CheckedListBox
             {
-                Location = new Point(190, 108),
+                Location = new Point(190, 148),
                 Size = new Size(150, 75),
                 Items = { "eBay", "Poshmark", "Depop", "Vinted" }
             };
@@ -158,7 +185,7 @@ namespace InventoryPOS.Forms
             var lblMaxImages = new Label
             {
                 Text = "Max Images/SKU:",
-                Location = new Point(20, 193),
+                Location = new Point(20, 233),
                 Size = new Size(110, 20),
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -167,7 +194,7 @@ namespace InventoryPOS.Forms
             // Max Images per SKU NumericUpDown
             var nudMaxImages = new NumericUpDown
             {
-                Location = new Point(135, 191),
+                Location = new Point(135, 231),
                 Size = new Size(150, 25),
                 Minimum = 1,
                 Maximum = 100,
@@ -183,7 +210,7 @@ namespace InventoryPOS.Forms
             var chkConfirmDelete = new CheckBox
             {
                 Text = "Confirm before delete",
-                Location = new Point(20, 226),
+                Location = new Point(20, 266),
                 Size = new Size(200, 24),
                 Checked = _uiState.ConfirmBeforeDelete
             };
@@ -197,7 +224,7 @@ namespace InventoryPOS.Forms
             var lblAiApiKey = new Label
             {
                 Text = "Google AI API Key:",
-                Location = new Point(20, 260),
+                Location = new Point(20, 300),
                 Size = new Size(110, 20),
                 TextAlign = ContentAlignment.MiddleLeft
             };
@@ -206,7 +233,7 @@ namespace InventoryPOS.Forms
             // Google AI API Key TextBox (masked by default)
             txtAiApiKey = new TextBox
             {
-                Location = new Point(135, 258),
+                Location = new Point(135, 298),
                 Size = new Size(245, 25),
                 PasswordChar = '*'
             };
@@ -216,7 +243,7 @@ namespace InventoryPOS.Forms
             btnShowApiKey = new Button
             {
                 Text = "Show",
-                Location = new Point(390, 257),
+                Location = new Point(390, 297),
                 Size = new Size(55, 27),
                 FlatStyle = FlatStyle.Flat,
                 Font = new Font("Segoe UI", 8F)
@@ -234,7 +261,7 @@ namespace InventoryPOS.Forms
             var lblAiHelp = new Label
             {
                 Text = "Used by the AI Fill button to analyze item pictures via Gemini. Get a key at https://aistudio.google.com/",
-                Location = new Point(135, 286),
+                Location = new Point(135, 326),
                 Size = new Size(395, 30),
                 ForeColor = Color.Gray,
                 Font = new Font("Segoe UI", 7.5F),
@@ -347,6 +374,7 @@ namespace InventoryPOS.Forms
         {
             txtPictureFolderPath.Text = _uiState.PictureFolderPath ?? string.Empty;
             txtLogFolderPath.Text = LoggerService.NormalizeLogFolderPath(_uiState.LogFolderPath) ?? string.Empty;
+            txtInventoryFilePath.Text = _uiState.LastFilePath ?? string.Empty;
             txtAiApiKey.Text = _uiState.GoogleAiApiKey ?? string.Empty;
             foreach (var marketplace in _uiState.CustomMarketplaces ?? new List<CustomMarketplace>())
             {
@@ -421,8 +449,63 @@ namespace InventoryPOS.Forms
             }
         }
 
+        private void BtnBrowseInventory_Click(object? sender, EventArgs e)
+        {
+            var initialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var fileName = string.Empty;
+            try
+            {
+                var currentPath = txtInventoryFilePath.Text.Trim();
+                if (!string.IsNullOrWhiteSpace(currentPath))
+                {
+                    var directory = Path.GetDirectoryName(currentPath);
+                    if (!string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory))
+                    {
+                        initialDirectory = directory;
+                    }
+                    fileName = Path.GetFileName(currentPath);
+                }
+            }
+            catch
+            {
+                // Ignore invalid text and open the picker in the default folder.
+            }
+
+            using var dialog = new OpenFileDialog
+            {
+                Title = "Select the inventory JSON file",
+                Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                CheckFileExists = false,
+                DefaultExt = "json",
+                AddExtension = true,
+                InitialDirectory = initialDirectory,
+                FileName = fileName
+            };
+
+            if (dialog.ShowDialog(this) == DialogResult.OK)
+            {
+                txtInventoryFilePath.Text = dialog.FileName;
+            }
+        }
+
         private void BtnSave_Click(object? sender, EventArgs e)
         {
+            string inventoryFilePath;
+            try
+            {
+                if (string.IsNullOrWhiteSpace(txtInventoryFilePath.Text))
+                {
+                    throw new ArgumentException("Enter an inventory JSON file path.");
+                }
+                inventoryFilePath = Path.GetFullPath(txtInventoryFilePath.Text.Trim());
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                MessageBox.Show(ex.Message, "Invalid Inventory File Path", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtInventoryFilePath.Focus();
+                return;
+            }
+
             // Gather the currently checked platforms from the CheckedListBox
             var selected = new List<string>();
             for (int i = 0; i < chkDefaultPlatforms.Items.Count; i++)
@@ -441,7 +524,7 @@ namespace InventoryPOS.Forms
                 SortOrder = _uiState.SortOrder,
                 FilterColumn = _uiState.FilterColumn,
                 FilterValue = _uiState.FilterValue,
-                LastFilePath = _uiState.LastFilePath,
+                LastFilePath = inventoryFilePath,
                 PictureFolderPath = txtPictureFolderPath.Text.Trim(),
                 LogFolderPath = LoggerService.NormalizeLogFolderPath(txtLogFolderPath.Text),
                 GoogleAiApiKey = txtAiApiKey.Text.Trim(),
